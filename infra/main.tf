@@ -115,8 +115,17 @@ resource "google_vertex_ai_model" "model" {
 
 # モデルアーカイブ（ZIP 等）を GCS にアップロード
 resource "google_storage_bucket_object" "model_artifact" {
-  name         = "models/${var.model_name}/${terraform.workspace}/${var.model_name}.zip"
+  name         = "models/${local.model_name}/${terraform.workspace}/${local.model_name}.zip"
   bucket       = google_storage_bucket.data_bucket.name
-  source       = "${path.module}/artifacts/${var.model_name}.zip"
+  source       = "${path.module}/artifacts/${local.model_name}.zip"
   content_type = "application/zip"
+}
+
+# ワークロード
+module "workloads" {
+  source     = "./workloads"
+  project_id = local.project_id
+  env_suffix = local.env_suffix
+
+  depends_on = [google_project_service.services]
 }
