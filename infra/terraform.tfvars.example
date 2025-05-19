@@ -1,0 +1,5 @@
+project_id      = "PROJECT_ID"
+region          = "asia-northeast1"
+dataset_prefix  = "DEX"
+model_name      = "IFOREST"
+model_image_uri = "asia-northeast1-docker.pkg.dev/PROJECT_ID/ml/IFOREST-train:latest"
