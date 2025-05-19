@@ -9,7 +9,7 @@ locals {
   env_suffix = terraform.workspace
 
   # データセット名
-  dataset_id = "${var.dataset_prefix}_raw_${terraform.workspace}"
+  dataset_id = "${lower(var.dataset_prefix)}_raw_${terraform.workspace}"
 
   # サービスアカウント
   sa = module.service_accounts.emails
