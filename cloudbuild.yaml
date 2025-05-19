@@ -1,26 +1,33 @@
+# 置換変数
+substitutions:
+  _REGION: asia-northeast1 # デプロイリージョン
+  _ALG_NAME: iforest # アルゴリズム名
+  _IMAGE_TAG: latest # イメージタグ
+
 steps:
+  # 1) Docker イメージをビルド（アルゴリズム別の Dockerfile を使用）
   - name: "gcr.io/cloud-builders/docker"
     args:
       [
         "build",
         "-t",
-        "$_REGION-docker.pkg.dev/$PROJECT_ID/ml/iforest-train:latest",
+        "$_REGION-docker.pkg.dev/$PROJECT_ID/ml/${_ALG_NAME}-train:${_IMAGE_TAG}",
+        "-f",
+        "docker/${_ALG_NAME}/Dockerfile",
         ".",
       ]
-
+  # 2) Artifact Registry へイメージをプッシュ
   - name: "gcr.io/cloud-builders/docker"
     args:
-      ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/ml/iforest-train:latest"]
-
-  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
-    entrypoint: gcloud
+      [
+        "push",
+        "$_REGION-docker.pkg.dev/$PROJECT_ID/ml/${_ALG_NAME}-train:${_IMAGE_TAG}",
+      ]
+  # 3) Vertex AI Custom Job を作成しトレーニングを開始
+  - name: "gcloud"
+    entrypoint: "bash"
     args:
-      - ai
-      - custom-jobs
-      - create
-      - --region=$_REGION
-      - --display-name=iforest-train
-      - --worker-pool-spec=machine-type=n1-standard-4,container-image-uri=$_REGION-docker.pkg.dev/$PROJECT_ID/ml/iforest-train:latest
-
-substitutions:
-  _REGION: asia-northeast1
+      [
+        "-c",
+        "gcloud ai custom-jobs create --region=$_REGION --display-name=${_ALG_NAME}-train --worker-pool-spec=machine-type=n1-standard-4,replica-count=1,container-image-uri=$_REGION-docker.pkg.dev/$PROJECT_ID/ml/${_ALG_NAME}-train:${_IMAGE_TAG}",
+      ]

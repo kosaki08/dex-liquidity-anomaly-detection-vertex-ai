@@ -23,6 +23,10 @@ module "network" {
   subnet_ip_cidr_range    = "10.9.0.0/24"
   connector_ip_cidr_range = "10.8.0.0/28"
   env_suffix              = local.env_suffix
+
+  depends_on = [
+    google_project_service.services["compute.googleapis.com"],
+  ]
 }
 
 
@@ -55,7 +59,7 @@ module "service_accounts" {
 # BigQuery 用モジュール例
 module "bigquery" {
   source      = "terraform-google-modules/bigquery/google"
-  version     = "~> 7.0"
+  version     = "~> 9.0"
   project_id  = local.project_id
   dataset_id  = local.dataset_id
   location    = local.region
@@ -73,43 +77,8 @@ resource "google_vertex_ai_endpoint" "endpoint" {
     env = local.env_suffix
   }
 
-  deployed_models {
-    model           = google_vertex_ai_model.model.id
-    display_name    = "${local.model_name}-${local.env_suffix}"
-    service_account = module.service_accounts.emails["vertex"]
-
-    # 自動スケーリング設定
-    automatic_resources {
-      min_replica_count = 1
-      max_replica_count = 3
-    }
-  }
-}
-
-# Vertex AI モデル
-resource "google_vertex_ai_model" "model" {
-  display_name = "${local.model_name}-${local.env_suffix}"
-  region       = local.region
-
-  # モデルアセットの GCS パス
-  artifact_uri = "gs://${google_storage_bucket.data_bucket.name}/${google_storage_bucket_object.model_artifact.name}"
-
-  # 公式コンテナ
-  container_spec {
-    image_uri     = local.model_image_uri
-    predict_route = "/predict"
-    health_route  = "/health"
-  }
-
-  # 自動スケーリング
-  supported_deployment_resources_types = ["AUTOMATIC_RESOURCES"]
-
-  labels = {
-    env = local.env_suffix
-  }
-
   depends_on = [
-    google_project_service.services["aiplatform.googleapis.com"]
+    google_project_service.services["aiplatform.googleapis.com"],
   ]
 }
 
@@ -117,7 +86,7 @@ resource "google_vertex_ai_model" "model" {
 resource "google_storage_bucket_object" "model_artifact" {
   name         = "models/${local.model_name}/${terraform.workspace}/${local.model_name}.zip"
   bucket       = google_storage_bucket.data_bucket.name
-  source       = "${path.module}/artifacts/${local.model_name}.zip"
+  source       = "${path.root}/../artifacts/${local.model_name}.zip"
   content_type = "application/zip"
 }
 

@@ -1,0 +1,37 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+
+# 環境設定
+.env
+.devcontainer/
+.vscode/
+
+# Service Account JSON キー
+sa-key.json
+
+# データ & キャッシュ
+data/
+mlruns/
+profiles/
+
+# dbt, Terraform キャッシュ
+target/
+dbt_modules/
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Docker, Compose
+.dockerignore
+docker-compose.yml
+
+# Mac
+.DS_Store
+
+# CI 関連
+.github/

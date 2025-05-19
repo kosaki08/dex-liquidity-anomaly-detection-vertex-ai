@@ -1,9 +1,9 @@
 locals {
   sa_training_roles       = ["roles/aiplatform.user", "roles/storage.objectAdmin"]
   sa_batch_predict_roles  = ["roles/aiplatform.user", "roles/storage.objectViewer"]
-  sa_model_registry_roles = ["roles/aiplatform.modelAdmin", "roles/artifactregistry.reader"]
+  sa_model_registry_roles = ["roles/aiplatform.admin", "roles/artifactregistry.reader"]
   sa_data_prep_roles      = ["roles/bigquery.dataEditor", "roles/storage.objectAdmin"]
-  sa_orchestrator_roles   = ["roles/aiplatform.pipelineRunner", "roles/composer.admin"]
+  sa_orchestrator_roles   = ["roles/composer.admin"]
   sa_ops_roles            = ["roles/monitoring.viewer"]
 }
 

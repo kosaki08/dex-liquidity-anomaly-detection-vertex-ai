@@ -1,7 +1,9 @@
-TF_DIR := $(CURDIR)/envs
-WORKSPACE ?= dev   # 引数が無ければ dev
-AUTOAPPROVE  ?=    # CI で -auto-approve を渡す用
-INIT_FLAGS ?=      # 例: "-upgrade -reconfigure"
+TF_DIR      := $(CURDIR)/envs
+WORKSPACE   ?=    # dev or prod
+AUTOAPPROVE ?=    # CI で -auto-approve を渡す用
+INIT_FLAGS  ?=    # 例: "-upgrade -reconfigure"
+BACKEND_CFG := -backend-config=envs/$(WORKSPACE)/backend.conf
+
 
 # サブディレクトリを指す
 ENV_DIR    := $(TF_DIR)/$(WORKSPACE)
@@ -17,19 +19,19 @@ test-modules: ## infra/modules/* の test.sh をすべて実行
 
 ## ---------- 一般コマンド ----------
 init:  ## terraform init $(INIT_FLAGS)
-	terraform -chdir=$(ENV_DIR) init $(INIT_FLAGS)
+	terraform init "$(BACKEND_CFG)" $(INIT_FLAGS)
 
 plan: ## terraform plan
-	terraform -chdir=$(ENV_DIR) plan
+	terraform plan
 
 validate: ## terraform validate
-	terraform -chdir=$(ENV_DIR) validate
+	terraform validate
 
 apply: guard-prod ## terraform apply $(AUTOAPPROVE)
-	terraform -chdir=$(ENV_DIR) apply $(AUTOAPPROVE)
+	terraform apply $(AUTOAPPROVE)
 
 destroy: guard-prod ## terraform destroy
-	terraform -chdir=$(ENV_DIR) destroy
+	terraform destroy
 
 help:  ## ヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
