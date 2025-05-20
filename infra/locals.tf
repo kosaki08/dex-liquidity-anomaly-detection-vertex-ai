@@ -17,9 +17,9 @@ locals {
   # モデル名
   model_name = var.model_name
 
-  # モデルイメージURI
-  model_image_uri = "asia-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest"
-
   # データバケット名
   bucket_name = "${var.project_id}-data-${terraform.workspace}"
+
+  # ローカルのモデル ZIP パス (存在チェック用)
+  model_zip_path = abspath("${path.module}/../artifacts/${var.model_name}.zip")
 }

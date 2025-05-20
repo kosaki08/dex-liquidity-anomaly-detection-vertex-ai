@@ -1,0 +1,162 @@
+{
+  "components": {
+    "comp-fetch-jsonl": {
+      "executorLabel": "exec-fetch-jsonl",
+      "inputDefinitions": {
+        "parameters": {
+          "interval_end_iso": {
+            "parameterType": "STRING"
+          },
+          "protocol": {
+            "parameterType": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "raw_jsonl": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      }
+    },
+    "comp-fetch-jsonl-2": {
+      "executorLabel": "exec-fetch-jsonl-2",
+      "inputDefinitions": {
+        "parameters": {
+          "interval_end_iso": {
+            "parameterType": "STRING"
+          },
+          "protocol": {
+            "parameterType": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "raw_jsonl": {
+            "artifactType": {
+              "schemaTitle": "system.Dataset",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "defaultPipelineRoot": "gs://{{ bucket_name }}/pipelines",
+  "deploymentSpec": {
+    "executors": {
+      "exec-fetch-jsonl": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "fetch_jsonl"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'requests==2.32.3' 'google-cloud-storage==2.16.0' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef fetch_jsonl(\n    protocol: str,\n    interval_end_iso: str,  # \u4f8b: \"2025-05-20T09:00:00Z\"\n    raw_jsonl: Output[Dataset],\n):\n    \"\"\"\n    The Graph \u304b\u3089\u76f4\u8fd1 1h \u3092\u53d6\u5f97\u3057 JSONL \u3092 raw_jsonl \u306b\u51fa\u529b\n    \"\"\"\n    # \u4e00\u6642\u30d5\u30a1\u30a4\u30eb\u306b\u4fdd\u5b58\u3057\u3066\u304b\u3089 OutputPath \u3078\u30b3\u30d4\u30fc\n    with tempfile.TemporaryDirectory() as tmp:\n        local_path = Path(tmp) / f\"{protocol}_{interval_end_iso}_pool.jsonl\"\n        fetch_pool_data(\n            protocol=protocol,\n            output_path=raw_jsonl.path,  # \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u306e\u51fa\u529b\u3092 Dataset \u5316\n            data_interval_end=interval_end_iso,\n        )\n\n        # kfp \u304c\u7528\u610f\u3057\u305f output(=directory) \u3078\u30b3\u30d4\u30fc\n        shutil.copy(str(local_path), raw_jsonl)\n\n    logger.info(f\"saved {protocol} JSONL \u2192 {raw_jsonl}\")\n\n"
+          ],
+          "image": "python:3.11-slim"
+        }
+      },
+      "exec-fetch-jsonl-2": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "fetch_jsonl"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'requests==2.32.3' 'google-cloud-storage==2.16.0' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef fetch_jsonl(\n    protocol: str,\n    interval_end_iso: str,  # \u4f8b: \"2025-05-20T09:00:00Z\"\n    raw_jsonl: Output[Dataset],\n):\n    \"\"\"\n    The Graph \u304b\u3089\u76f4\u8fd1 1h \u3092\u53d6\u5f97\u3057 JSONL \u3092 raw_jsonl \u306b\u51fa\u529b\n    \"\"\"\n    # \u4e00\u6642\u30d5\u30a1\u30a4\u30eb\u306b\u4fdd\u5b58\u3057\u3066\u304b\u3089 OutputPath \u3078\u30b3\u30d4\u30fc\n    with tempfile.TemporaryDirectory() as tmp:\n        local_path = Path(tmp) / f\"{protocol}_{interval_end_iso}_pool.jsonl\"\n        fetch_pool_data(\n            protocol=protocol,\n            output_path=raw_jsonl.path,  # \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u306e\u51fa\u529b\u3092 Dataset \u5316\n            data_interval_end=interval_end_iso,\n        )\n\n        # kfp \u304c\u7528\u610f\u3057\u305f output(=directory) \u3078\u30b3\u30d4\u30fc\n        shutil.copy(str(local_path), raw_jsonl)\n\n    logger.info(f\"saved {protocol} JSONL \u2192 {raw_jsonl}\")\n\n"
+          ],
+          "image": "python:3.11-slim"
+        }
+      }
+    }
+  },
+  "pipelineInfo": {
+    "description": "DEX\u306e\u6d41\u52d5\u6027\u30c7\u30fc\u30bf\u3092\u53d6\u5f97",
+    "name": "dex-liquidity-raw"
+  },
+  "root": {
+    "dag": {
+      "tasks": {
+        "fetch-jsonl": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-fetch-jsonl"
+          },
+          "inputs": {
+            "parameters": {
+              "interval_end_iso": {
+                "componentInputParameter": "interval_end_iso"
+              },
+              "protocol": {
+                "runtimeValue": {
+                  "constant": "uniswap"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "fetch-jsonl"
+          }
+        },
+        "fetch-jsonl-2": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-fetch-jsonl-2"
+          },
+          "inputs": {
+            "parameters": {
+              "interval_end_iso": {
+                "componentInputParameter": "interval_end_iso"
+              },
+              "protocol": {
+                "runtimeValue": {
+                  "constant": "sushiswap"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "fetch-jsonl-2"
+          }
+        }
+      }
+    },
+    "inputDefinitions": {
+      "parameters": {
+        "interval_end_iso": {
+          "defaultValue": "{{$.pipeline_job.create_time}}",
+          "isOptional": true,
+          "parameterType": "STRING"
+        }
+      }
+    }
+  },
+  "schemaVersion": "2.1.0",
+  "sdkVersion": "kfp-2.13.0"
+}

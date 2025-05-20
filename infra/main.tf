@@ -38,12 +38,19 @@ resource "google_storage_bucket" "data_bucket" {
   }
   location                    = local.region
   uniform_bucket_level_access = true
+
+  # バージョニング
+  versioning {
+    enabled = true
+  }
+
+  # ライフサイクルルール
   lifecycle_rule {
     action {
       type = "Delete"
     }
     condition {
-      age = 365
+      age = 365 # 365 日後に削除
     }
   }
 }
@@ -84,9 +91,10 @@ resource "google_vertex_ai_endpoint" "endpoint" {
 
 # モデルアーカイブ（ZIP 等）を GCS にアップロード
 resource "google_storage_bucket_object" "model_artifact" {
+  count        = fileexists(local.model_zip_path) ? 1 : 0
   name         = "models/${local.model_name}/${terraform.workspace}/${local.model_name}.zip"
   bucket       = google_storage_bucket.data_bucket.name
-  source       = "${path.root}/../artifacts/${local.model_name}.zip"
+  source       = local.model_zip_path
   content_type = "application/zip"
 }
 

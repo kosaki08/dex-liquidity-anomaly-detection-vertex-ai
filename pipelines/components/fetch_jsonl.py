@@ -1,0 +1,46 @@
+import sys
+from pathlib import Path
+
+# ruff: noqa
+proj_root = Path(__file__).resolve().parents[2]
+if str(proj_root) not in sys.path:
+    sys.path.append(str(proj_root))
+
+import logging
+import shutil
+import tempfile
+from typing import Annotated
+
+
+from kfp.v2.dsl import component, Dataset, Output
+
+from scripts.fetcher.run_fetch import fetch_pool_data
+
+logger = logging.getLogger(__name__)
+
+
+@component(
+    base_image="python:3.11-slim",
+    packages_to_install=["requests==2.32.3", "google-cloud-storage==2.16.0"],
+)
+def fetch_jsonl(
+    protocol: str,
+    interval_end_iso: str,  # 例: "2025-05-20T09:00:00Z"
+    raw_jsonl: Output[Dataset],
+):
+    """
+    The Graph から直近 1h を取得し JSONL を raw_jsonl に出力
+    """
+    # 一時ファイルに保存してから OutputPath へコピー
+    with tempfile.TemporaryDirectory() as tmp:
+        local_path = Path(tmp) / f"{protocol}_{interval_end_iso}_pool.jsonl"
+        fetch_pool_data(
+            protocol=protocol,
+            output_path=raw_jsonl.path,  # コンポーネントの出力を Dataset 化
+            data_interval_end=interval_end_iso,
+        )
+
+        # kfp が用意した output(=directory) へコピー
+        shutil.copy(str(local_path), raw_jsonl)
+
+    logger.info(f"saved {protocol} JSONL → {raw_jsonl}")

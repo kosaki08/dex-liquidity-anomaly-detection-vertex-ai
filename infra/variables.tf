@@ -20,3 +20,9 @@ variable "model_name" {
   description = "モデル名"
   default     = "iforest"
 }
+
+variable "model_image_uri" {
+  type        = string
+  description = "カスタムモデルのコンテナイメージ URI"
+  default     = "asia-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest"
+}
