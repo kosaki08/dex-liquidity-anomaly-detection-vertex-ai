@@ -1,0 +1,81 @@
+{
+  "name": "Vertex AI Pipelines Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "tflint": "latest"
+    },
+    "ghcr.io/dhoeric/features/tfsec:1": {},
+    "ghcr.io/meaningful-ooo/devcontainer-features/fish:2": {},
+    "ghcr.io/larsnieuwenhuizen/features/neovim:0": {},
+    "ghcr.io/dhoeric/features/google-cloud-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml",
+        "mhutchie.git-graph"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "dbtPowerUser.dbtProjectSubfolder": "models",
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "[json]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[yaml]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[markdown]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit"
+          }
+        },
+        "notebook.formatOnSave.enabled": true,
+        "notebook.codeActionsOnSave": {
+          "notebook.source.fixAll.ruff": "explicit",
+          "notebook.source.organizeImports.ruff": "explicit"
+        },
+        "[terraform]": {
+          "editor.defaultFormatter": "hashicorp.terraform",
+          "editor.formatOnSave": true,
+          "editor.formatOnSaveMode": "file"
+        },
+        "[terraform-vars]": {
+          "editor.defaultFormatter": "hashicorp.terraform",
+          "editor.formatOnSave": true,
+          "editor.formatOnSaveMode": "file"
+        },
+        "terminal.integrated.defaultProfile.linux": "fish",
+        "terminal.integrated.profiles.linux": {
+          "fish": {
+            "path": "/usr/bin/fish",
+            "icon": "squirrel"
+          }
+        }
+      }
+    }
+  },
+  "postCreateCommand": "poetry install --no-root --no-interaction",
+  "forwardPorts": [
+    8888
+  ],
+  "remoteUser": "vscode"
+}
