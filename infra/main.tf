@@ -53,13 +53,16 @@ resource "google_storage_bucket" "data_bucket" {
       age = 365 # 365 日後に削除
     }
   }
+
+  # dev 環境の場合は強制的に削除可能に
+  force_destroy = var.env_suffix == "dev" ? true : false
 }
 
 # サービスアカウント
 module "service_accounts" {
   source     = "./modules/service_accounts"
   project_id = local.project_id
-  sa_names   = ["vertex"]
+  sa_names   = ["vertex", "vertex-pipeline"]
   env        = local.env_suffix # dev / prod
 }
 

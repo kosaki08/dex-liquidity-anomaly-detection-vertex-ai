@@ -26,3 +26,9 @@ variable "model_image_uri" {
   description = "カスタムモデルのコンテナイメージ URI"
   default     = "asia-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest"
 }
+
+variable "env_suffix" {
+  type        = string
+  description = "環境を区別するサフィックス"
+  default     = "dev"
+}
