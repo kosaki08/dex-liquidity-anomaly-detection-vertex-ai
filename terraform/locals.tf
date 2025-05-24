@@ -25,4 +25,14 @@ locals {
 
   # Terraform 実行時に impersonate する Service Account
   impersonate_sa = "tf-apply-${var.env_suffix}@${var.project_id}.iam.gserviceaccount.com"
+
+  # ラベル
+  common_labels = {
+    environment = var.env_suffix          # dev/prod
+    project     = "dex-anomaly-detection" # プロジェクト名
+    project_id  = local.project_id        # GCPプロジェクトID
+    managed_by  = "terraform"             # 管理方法
+    team        = "ml-platform"           # チーム名
+    cost_center = "research-dev"          # コスト管理用
+  }
 }

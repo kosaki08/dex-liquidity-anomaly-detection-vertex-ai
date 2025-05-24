@@ -5,9 +5,13 @@
     "context": ".."
   },
   "containerEnv": {
-    "REGION": "asia-northeast1"
+    "REGION": "asia-northeast1",
+    "TF_WORKSPACE": "dev"
   },
-  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+  "mounts": [
+    "source=${localEnv:HOME}/.config/gcloud,target=/home/vscode/.config/gcloud,type=bind"
+  ],
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/node:1": {
@@ -16,7 +20,7 @@
     "ghcr.io/devcontainers/features/terraform:1": {
       "tflint": "latest"
     },
-    "ghcr.io/dhoeric/features/tfsec:1": {},
+    "ghcr.io/dhoeric/features/trivy:1": {},
     "ghcr.io/larsnieuwenhuizen/features/neovim:0": {},
     "ghcr.io/dhoeric/features/google-cloud-cli:1": {}
   },
@@ -29,7 +33,8 @@
         "tamasfe.even-better-toml",
         "mhutchie.git-graph",
         "esbenp.prettier-vscode",
-        "foxundermoon.shell-format"
+        "foxundermoon.shell-format",
+        "hashicorp.terraform"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -80,6 +85,6 @@
     }
   },
   "postCreateCommand": "/bin/bash .devcontainer/post-create.sh",
-  "forwardPorts": [8888],
+  "forwardPorts": [8888, 8501],
   "remoteUser": "vscode"
 }

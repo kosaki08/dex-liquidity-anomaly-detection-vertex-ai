@@ -19,23 +19,16 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
   }
 
   # GitHubリポジトリとブランチを制限
-  attribute_condition = "attribute.repository == '${var.github_organization}/${var.repository_name}' && contains(var.allowed_branches, attribute.ref)"
+  attribute_condition = "attribute.repository == '${var.github_organization}/${var.repository_name}' && contains(${jsonencode(var.allowed_branches)}, attribute.ref)"
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
 }
 
-# dev 環境のTerraform SAにimpersonation権限を付与
-resource "google_service_account_iam_member" "github_sa_impersonation_dev" {
-  service_account_id = "tf-apply-dev@${var.project_id}.iam.gserviceaccount.com"
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/${var.github_organization}/${var.repository_name}"
-}
-
-# prod 環境のTerraform SAにimpersonation権限を付与
-resource "google_service_account_iam_member" "github_sa_impersonation_prod" {
-  service_account_id = "tf-apply-prod@${var.project_id}.iam.gserviceaccount.com"
+# 現在の環境のTerraform SAにimpersonation権限を付与
+resource "google_service_account_iam_member" "github_sa_impersonation" {
+  service_account_id = google_service_account.tf_apply.name
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/${var.github_organization}/${var.repository_name}"
 }

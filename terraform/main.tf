@@ -5,10 +5,11 @@ resource "google_project_service" "services" {
     "composer.googleapis.com",
     "aiplatform.googleapis.com",
     "artifactregistry.googleapis.com",
-    "storage.googleapis.com",       # Composer/BigQuery バケット用
-    "compute.googleapis.com",       # VPC ネットワーク用
-    "vpcaccess.googleapis.com",     # Serverless VPC Access Connector 用
-    "iamcredentials.googleapis.com" # サービスアカウント用
+    "storage.googleapis.com",        # Composer/BigQuery バケット用
+    "compute.googleapis.com",        # VPC ネットワーク用
+    "vpcaccess.googleapis.com",      # Serverless VPC Access Connector 用
+    "iamcredentials.googleapis.com", # サービスアカウント用
+    "secretmanager.googleapis.com"   # シークレットマネージャー用
   ])
   service = each.key
 }
@@ -64,6 +65,19 @@ module "service_accounts" {
   project_id = local.project_id
   sa_names   = ["vertex", "vertex-pipeline"]
   env        = local.env_suffix # dev / prod
+}
+
+# API キーを Secret Manager に保存
+resource "google_secret_manager_secret" "api_keys" {
+  for_each = toset(["the-graph-api-key", "slack-webhook-url"])
+
+  secret_id = "${each.key}-${local.env_suffix}"
+
+  replication {
+    auto {}
+  }
+
+  labels = local.common_labels
 }
 
 # BigQuery 用モジュール例

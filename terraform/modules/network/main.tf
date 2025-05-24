@@ -33,7 +33,6 @@ resource "google_vpc_access_connector" "connector" {
 }
 
 # 4) インターネットへのアウトバウンドを許可
-# tfsec:ignore:google-compute-no-public-egress # GCP Private Google Access 向けのため許容
 resource "google_compute_firewall" "allow_egress_internet" {
   name    = "${var.network_name}-egress"
   project = var.project_id
@@ -41,10 +40,16 @@ resource "google_compute_firewall" "allow_egress_internet" {
 
   direction = "EGRESS"
   allow {
-    protocol = "all"
+    protocol = "tcp"
+    ports = [
+      "443", # HTTPS - GCP API、Container Registry、外部API通信
+      "80"   # HTTP - 一部のパッケージダウンロード、リダイレクト用
+    ]
   }
 
-  # プライベートGoogleアクセスアドレスのみが許可しているため、　tfsec　の警告を　ignore
-  destination_ranges = ["199.36.153.4/30"] # GCP Private Google Access 範囲
-  priority           = 65534
+  destination_ranges = [
+    "199.36.153.4/30",    # Private Google Access（GCP APIs）
+    "169.254.169.254/32", # Metadata server（認証情報取得）
+  ]
+  priority = 65534 # GCP のデフォルトの最低優先度
 }

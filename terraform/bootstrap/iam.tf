@@ -35,7 +35,9 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
     "roles/serviceusage.serviceUsageAdmin",  # API有効化
     "roles/compute.networkAdmin",            # VPC管理
     "roles/aiplatform.admin",                # Vertex AI管理
-    "roles/bigquery.admin"                   # BigQuery管理
+    "roles/bigquery.admin",                  # BigQuery管理
+    "roles/secretmanager.admin",             # シークレットマネージャー管理
+    "roles/compute.securityAdmin"            # ファイアウォール更新用
   ])
   project = var.project_id
   role    = each.value
