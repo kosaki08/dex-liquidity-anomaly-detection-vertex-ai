@@ -106,6 +106,26 @@ resource "google_vertex_ai_endpoint" "endpoint" {
   ]
 }
 
+# Feature Store
+module "feature_store" {
+  source       = "./modules/feature_store"
+  project_id   = local.project_id
+  project_name = "dex-anomaly-detection"
+  region       = local.region
+  env_suffix   = local.env_suffix
+
+  common_labels = local.common_labels
+
+  # dev環境では最小構成
+  online_serving_node_count = var.env_suffix == "dev" ? 1 : 2
+
+  aiplatform_service_dependency = google_project_service.services["aiplatform.googleapis.com"]
+
+  depends_on = [
+    google_project_service.services["aiplatform.googleapis.com"],
+  ]
+}
+
 # モデルアーカイブ（ZIP 等）を GCS にアップロード
 resource "google_storage_bucket_object" "model_artifact" {
   count = fileexists(local.model_zip_path) ? 1 : 0

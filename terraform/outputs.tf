@@ -17,3 +17,19 @@ output "data_bucket_name" {
   description = "The Graph 生 JSONL を置く GCS バケット名"
   value       = google_storage_bucket.data_bucket.name
 }
+
+# ---------- Feature Store 関連の output ----------
+output "featurestore_id" {
+  description = "作成された Feature Store の ID"
+  value       = module.feature_store.featurestore_id
+}
+
+output "featurestore_name" {
+  description = "作成された Feature Store の名前"
+  value       = module.feature_store.featurestore_name
+}
+
+output "entitytype_id" {
+  description = "作成された Entity Type の ID"
+  value       = module.feature_store.entitytype_id
+}

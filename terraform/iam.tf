@@ -54,3 +54,19 @@ resource "google_project_iam_member" "vertex_pipeline_bq" {
   role    = "roles/bigquery.dataEditor"
   member  = "serviceAccount:${local.sa["vertex-pipeline"]}"
 }
+
+
+# ---------- Feature Store 関連の権限 ----------
+# Feature Store ユーザー権限
+resource "google_project_iam_member" "vertex_featurestore_user" {
+  project = local.project_id
+  role    = "roles/aiplatform.featurestoreUser"
+  member  = "serviceAccount:${local.sa["vertex"]}"
+}
+
+# Feature Store 管理者権限
+resource "google_project_iam_member" "vertex_pipeline_featurestore_admin" {
+  project = local.project_id
+  role    = "roles/aiplatform.featurestoreAdmin"
+  member  = "serviceAccount:${local.sa["vertex-pipeline"]}"
+}
