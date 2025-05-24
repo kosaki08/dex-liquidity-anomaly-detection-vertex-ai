@@ -4,6 +4,9 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
+  "containerEnv": {
+    "REGION": "asia-northeast1"
+  },
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
@@ -14,7 +17,6 @@
       "tflint": "latest"
     },
     "ghcr.io/dhoeric/features/tfsec:1": {},
-    "ghcr.io/meaningful-ooo/devcontainer-features/fish:2": {},
     "ghcr.io/larsnieuwenhuizen/features/neovim:0": {},
     "ghcr.io/dhoeric/features/google-cloud-cli:1": {}
   },
@@ -25,7 +27,9 @@
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
         "tamasfe.even-better-toml",
-        "mhutchie.git-graph"
+        "mhutchie.git-graph",
+        "esbenp.prettier-vscode",
+        "foxundermoon.shell-format"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -48,11 +52,6 @@
             "source.fixAll.ruff": "explicit"
           }
         },
-        "notebook.formatOnSave.enabled": true,
-        "notebook.codeActionsOnSave": {
-          "notebook.source.fixAll.ruff": "explicit",
-          "notebook.source.organizeImports.ruff": "explicit"
-        },
         "[terraform]": {
           "editor.defaultFormatter": "hashicorp.terraform",
           "editor.formatOnSave": true,
@@ -63,19 +62,24 @@
           "editor.formatOnSave": true,
           "editor.formatOnSaveMode": "file"
         },
-        "terminal.integrated.defaultProfile.linux": "fish",
-        "terminal.integrated.profiles.linux": {
-          "fish": {
-            "path": "/usr/bin/fish",
-            "icon": "squirrel"
-          }
+        "[shellscript]": {
+          "editor.defaultFormatter": "foxundermoon.shell-format"
+        },
+        "[dotenv]": {
+          "editor.defaultFormatter": "foxundermoon.shell-format"
+        },
+        "[ignore]": {
+          "editor.defaultFormatter": "foxundermoon.shell-format"
+        },
+        "notebook.formatOnSave.enabled": true,
+        "notebook.codeActionsOnSave": {
+          "notebook.source.fixAll.ruff": "explicit",
+          "notebook.source.organizeImports.ruff": "explicit"
         }
       }
     }
   },
-  "postCreateCommand": "poetry install --no-root --no-interaction",
-  "forwardPorts": [
-    8888
-  ],
+  "postCreateCommand": "/bin/bash .devcontainer/post-create.sh",
+  "forwardPorts": [8888],
   "remoteUser": "vscode"
 }

@@ -14,21 +14,10 @@ __pycache__/
 # Service Account JSON キー
 sa-key.json
 
-# データ & キャッシュ
-data/
-mlruns/
-profiles/
-
-# dbt, Terraform キャッシュ
-target/
-dbt_modules/
+# Terraform キャッシュ
 .terraform/
 *.tfstate
 *.tfstate.*
-
-# Docker, Compose
-.dockerignore
-docker-compose.yml
 
 # Mac
 .DS_Store
