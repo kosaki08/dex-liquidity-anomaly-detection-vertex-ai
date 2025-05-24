@@ -4,11 +4,9 @@ AUTOAPPROVE ?=    # CI で -auto-approve を渡す用
 INIT_FLAGS  ?=    # 例: "-upgrade -reconfigure"
 BACKEND_CFG := -backend-config=envs/$(WORKSPACE)/backend.conf
 
+.PHONY: local-dev
 
-# サブディレクトリを指す
-ENV_DIR    := $(TF_DIR)/$(WORKSPACE)
-
-## ---------- モジュール単体テスト ----------
+# ---------- モジュール単体テスト ----------
 test-modules: ## infra/modules/* の test.sh をすべて実行
 	for dir in infra/modules/*; do \
 	  if [ -x $$dir/test.sh ]; then \
@@ -16,8 +14,13 @@ test-modules: ## infra/modules/* の test.sh をすべて実行
 	    (cd $$dir && ./test.sh); \
 	  fi \
 	done
+	
 
-## ---------- 一般コマンド ----------
+## ---------- ローカル開発 ----------
+local-dev:  ## ローカル開発環境での認証設定
+	gcloud auth application-default login --impersonate-service-account=tf-apply-dev@$(PROJECT_ID).iam.gserviceaccount.com
+
+# ---------- 一般コマンド ----------
 init:  ## terraform init $(INIT_FLAGS)
 	terraform init "$(BACKEND_CFG)" $(INIT_FLAGS)
 

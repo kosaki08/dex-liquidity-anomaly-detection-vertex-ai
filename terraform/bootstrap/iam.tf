@@ -25,3 +25,26 @@ resource "google_project_iam_member" "tf_sa_security_reviewer" {
   role    = "roles/iam.securityReviewer"
   member  = "serviceAccount:${google_service_account.tf_apply.email}"
 }
+
+# tf-apply SA に必要な管理権限を付与
+resource "google_project_iam_member" "tf_sa_admin_roles" {
+  for_each = toset([
+    "roles/storage.admin",                   # GCS バケット管理
+    "roles/iam.serviceAccountAdmin",         # サービスアカウント管理
+    "roles/resourcemanager.projectIamAdmin", # プロジェクトレベルIAM管理
+    "roles/serviceusage.serviceUsageAdmin",  # API有効化
+    "roles/compute.networkAdmin",            # VPC管理
+    "roles/aiplatform.admin",                # Vertex AI管理
+    "roles/bigquery.admin"                   # BigQuery管理
+  ])
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
+# Service Account Token Creator (impersonation用)
+resource "google_service_account_iam_member" "tf_sa_token_creator" {
+  service_account_id = google_service_account.tf_apply.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.tf_apply.email}"
+}

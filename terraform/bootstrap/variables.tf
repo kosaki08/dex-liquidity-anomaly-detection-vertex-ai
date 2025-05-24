@@ -20,3 +20,27 @@ variable "state_bucket" {
   type        = string
   default     = "terraform-state-portfolio-dex"
 }
+
+variable "github_repository" {
+  description = "GitHub リポジトリ名（organization/repository）"
+  type        = string
+  default     = "kosaki08/dex-liquidity-anomaly-detection-vertex-ai"
+}
+
+variable "allowed_branches" {
+  description = "許可するブランチ一覧"
+  type        = list(string)
+  default     = ["refs/heads/main", "refs/heads/develop"]
+}
+
+variable "github_organization" {
+  description = "GitHub organization名"
+  type        = string
+  default     = "kosaki08"
+}
+
+variable "repository_name" {
+  description = "リポジトリ名"
+  type        = string
+  default     = "dex-liquidity-anomaly-detection-vertex-ai"
+}

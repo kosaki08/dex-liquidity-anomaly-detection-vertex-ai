@@ -94,10 +94,19 @@ resource "google_vertex_ai_endpoint" "endpoint" {
 
 # モデルアーカイブ（ZIP 等）を GCS にアップロード
 resource "google_storage_bucket_object" "model_artifact" {
-  count        = fileexists(local.model_zip_path) ? 1 : 0
-  name         = "models/${local.model_name}/${terraform.workspace}/${local.model_name}.zip"
-  bucket       = google_storage_bucket.data_bucket.name
-  source       = local.model_zip_path
+  count = fileexists(local.model_zip_path) ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = fileexists(local.model_zip_path) || var.env_suffix == "dev"
+      error_message = "モデルアーティファクトが見つかりません: ${local.model_zip_path}"
+    }
+  }
+
+  name   = "models/${local.model_name}/${terraform.workspace}/${local.model_name}.zip"
+  bucket = google_storage_bucket.data_bucket.name
+  source = local.model_zip_path
+
   content_type = "application/zip"
 }
 

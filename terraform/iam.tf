@@ -24,6 +24,11 @@ resource "google_project_iam_member" "vertex_model_data_reader" {
   project = local.project_id
   role    = "roles/storage.objectViewer"
   member  = "serviceAccount:${local.sa["vertex"]}"
+
+  condition {
+    title      = "Restrict to model bucket"
+    expression = "resource.name.startsWith('projects/_/buckets/${local.bucket_name}')"
+  }
 }
 
 # Vertex Pipelines ジョブ実行（AI Platform User）
