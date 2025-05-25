@@ -42,7 +42,7 @@ jobs:
         working-directory: terraform
         run: |
           terraform init \
-            -backend-config="bucket=terraform-state-portfolio-vertex-ai-dex " \
+            -backend-config="bucket=terraform-state-portfolio-vertex-ai-dex" \
             -backend-config="prefix=vertex-ai/prod" \
             -input=false
 
