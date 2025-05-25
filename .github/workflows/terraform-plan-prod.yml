@@ -11,6 +11,7 @@ on:
   pull_request:
     branches: [main]
     paths: ["infra/**"]
+  workflow_dispatch: # UI から手動トリガー可能
 
 jobs:
   call-plan:

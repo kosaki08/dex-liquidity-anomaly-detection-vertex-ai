@@ -9,6 +9,7 @@ on:
   push:
     branches: [develop]
     paths: ["terraform/**"]
+  workflow_dispatch: # UI から手動トリガー可能
 
 jobs:
   apply:
