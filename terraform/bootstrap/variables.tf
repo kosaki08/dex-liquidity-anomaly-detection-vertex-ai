@@ -18,7 +18,7 @@ variable "env_suffix" {
 variable "state_bucket" {
   description = "Terraform state を格納する GCS バケット名"
   type        = string
-  default     = "terraform-state-portfolio-dex"
+  default     = "terraform-state-portfolio-vertex-ai-dex"
 }
 
 variable "github_repository" {

@@ -1,6 +1,6 @@
 # Feature Store の作成
 resource "google_vertex_ai_featurestore" "main" {
-  name    = "${var.project_name}-featurestore-${var.env_suffix}"
+  name    = "${replace(var.project_name, "-", "_")}_featurestore_${var.env_suffix}"
   region  = var.region
   project = var.project_id
 

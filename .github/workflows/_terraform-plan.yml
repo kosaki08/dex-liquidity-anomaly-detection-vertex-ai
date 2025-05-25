@@ -1,0 +1,120 @@
+# プラン実行用
+name: "_terraform-plan"
+
+on:
+  workflow_call:
+    inputs:
+      workspace: { required: true, type: string }
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-${{ inputs.workspace }}-plan # 同時実行防止
+      cancel-in-progress: true # 古いプランのみキャンセル
+    steps:
+      # 1) リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2) GCP 認証：Auth
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
+          service_account: tf-apply-${{ inputs.workspace }}@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
+          project_id: ${{ secrets.PROJECT_ID }}
+
+      # 3) Terraform をセットアップ
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: 1.8.0
+
+      # 4) Terraform の初期化
+      - name: Initialize Terraform
+        working-directory: terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=terraform-state-portfolio-vertex-ai-dex" \
+            -backend-config="prefix=vertex-ai/${{ inputs.workspace }}" \
+            -input=false
+
+      # 5) Terraform の検証
+      - name: Validate Terraform
+        working-directory: terraform
+        run: terraform validate
+
+      # 6) Terraform のフォーマットチェック
+      - name: Format Check
+        working-directory: terraform
+        run: terraform fmt -check
+
+      # 7) TFLint のセットアップ
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.51.1
+
+      # 8) TFLint の初期化
+      - name: Init TFLint
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # 9) TFLint の実行
+      - name: Run TFLint
+        run: tflint --chdir terraform
+
+      # 10) Trivy IaC スキャン
+      - name: Run Trivy IaC scanner
+        id: trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: "config"
+          scan-ref: "./terraform"
+          severity: "HIGH,CRITICAL"
+          output: trivy-scan-result.txt
+          exit-code: "0"
+
+      # 11) PR へ Trivy スキャン結果コメント
+      - name: Comment Trivy scan result to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            let body = fs.readFileSync('trivy-scan-result.txt', 'utf8').trim();
+
+            if (!body) {
+              body = 'Trivy scan: 検出なし🎉';
+            }
+
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      # 12) Terraform Plan の実行
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform
+        run: |
+          terraform plan \
+            -var "project_id=${{ secrets.PROJECT_ID }}" \
+            -var "env_suffix=${{ inputs.workspace }}" \
+            -lock-timeout=300s \
+            -no-color \
+            -detailed-exitcode \
+            -out=tfplan || [ $? -eq 2 ] || exit 1
+
+      # 13) PR へ Plan コメント
+      - name: Comment plan to PR
+        if: github.event_name == 'pull_request'
+        uses: borchero/terraform-plan-comment@v2
+        with:
+          token: ${{ github.token }}
+          planfile: tfplan
+          working-directory: terraform
+          header: "Terraform Plan (${{ inputs.workspace }})"
+          skip-empty: true # 変更なしならコメントしない
