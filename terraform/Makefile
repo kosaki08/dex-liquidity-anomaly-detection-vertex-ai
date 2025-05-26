@@ -11,8 +11,8 @@ BACKEND_CFG := -backend-config=envs/$(WORKSPACE)/backend.conf
 .PHONY: local-dev
 
 # ---------- モジュール単体テスト ----------
-test-modules: ## infra/modules/* の test.sh をすべて実行
-	for dir in infra/modules/*; do \
+test-modules: ## terraform/modules/* の test.sh をすべて実行
+	for dir in terraform/modules/*; do \
 	  if [ -x $$dir/test.sh ]; then \
 	    echo "▶ Testing $$dir"; \
 	    (cd $$dir && ./test.sh); \
