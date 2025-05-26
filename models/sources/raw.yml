@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "BigQuery RAW layer"
+    database: "{{ target.database }}"
+    schema: "{{ var('raw_dataset', 'dex_raw_dev') }}" # 例: dev は dex_raw_dev
+
+    tables:
+      - name: pool_hourly_uniswap_v3
+        description: "hourly poolHourData (Uniswap V3)"
+      - name: pool_hourly_sushiswap_v3
+        description: "hourly poolHourData (Sushiswap V3)"

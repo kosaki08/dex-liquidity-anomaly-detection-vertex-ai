@@ -12,7 +12,7 @@ on:
 jobs:
   apply:
     runs-on: ubuntu-latest
-    environment: production
+    environment: prod
     concurrency:
       group: terraform-prod-apply
       cancel-in-progress: false # デプロイ中はキャンセルしない

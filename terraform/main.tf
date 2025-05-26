@@ -80,16 +80,15 @@ resource "google_secret_manager_secret" "api_keys" {
   labels = local.common_labels
 }
 
-# BigQuery 用モジュール例
+# BigQueryモジュール
 module "bigquery" {
-  source      = "terraform-google-modules/bigquery/google"
-  version     = "~> 9.0"
-  project_id  = local.project_id
-  dataset_id  = local.dataset_id
-  location    = local.region
-  description = "DEX liquidity raw data (The Graph)"
-
-  depends_on = [google_project_service.services]
+  source         = "./modules/bigquery"
+  project_id     = local.project_id
+  region         = local.region
+  dataset_prefix = var.dataset_prefix
+  env_suffix     = local.env_suffix
+  common_labels  = local.common_labels
+  kms_key_name   = var.kms_key_name
 }
 
 # Vertex AI エンドポイント
