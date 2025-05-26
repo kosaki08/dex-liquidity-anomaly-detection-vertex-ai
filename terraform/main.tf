@@ -109,6 +109,7 @@ resource "google_vertex_ai_endpoint" "endpoint" {
 # Feature Store
 module "feature_store" {
   source       = "./modules/feature_store"
+  count        = var.enable_feature_store ? 1 : 0 # 条件付き作成
   project_id   = local.project_id
   project_name = "dex-anomaly-detection"
   region       = local.region

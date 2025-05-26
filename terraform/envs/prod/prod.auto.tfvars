@@ -1,1 +1,2 @@
-env_suffix = "prod"
+env_suffix           = "prod"
+enable_feature_store = true

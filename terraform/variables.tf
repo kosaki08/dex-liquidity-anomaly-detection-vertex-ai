@@ -28,11 +28,11 @@ variable "env_suffix" {
 }
 
 # # ---------- Feature Store 関連の変数 ----------
-# variable "enable_feature_store" {
-#   type        = bool
-#   description = "Feature Store を有効にするかどうか"
-#   default     = true
-# }
+variable "enable_feature_store" {
+  type        = bool
+  description = "Feature Store を有効にするかどうか"
+  default     = false
+}
 
 # variable "feature_store_node_count" {
 #   type        = number
