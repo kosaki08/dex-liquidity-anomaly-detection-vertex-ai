@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_pool_hourly_uniswap_v3
+    description: "Typed hourly data for Uniswap V3"
+    columns:
+      - name: pool_id
+        tests: [not_null]
+      - name: hour_ts
+        tests: [not_null]
+
+  - name: stg_pool_hourly_sushiswap_v3
+    description: "Typed hourly data for Sushiswap V3"
+    columns:
+      - name: pool_id
+        tests: [not_null]
+      - name: hour_ts
+        tests: [not_null]
