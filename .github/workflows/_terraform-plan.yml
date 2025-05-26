@@ -28,18 +28,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # OIDC トークンと ref を確認
-      - name: Dump OIDC claims
-        id: dump
-        env:
-          # GitHub が発行する ID トークン
-          ID_TOKEN: ${{ steps.auth.outputs.id_token || '' }}
-        run: |
-          echo "GITHUB_EVENT_NAME = $GITHUB_EVENT_NAME"
-          echo "GITHUB_REF        = $GITHUB_REF"
-          echo "GITHUB_HEAD_REF   = $GITHUB_HEAD_REF"
-          echo "GITHUB_BASE_REF   = $GITHUB_BASE_REF"
-
       # 2) GCP 認証
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
