@@ -48,6 +48,10 @@ jobs:
       - name: Apply Terraform
         working-directory: terraform
         run: |
+          terraform refresh \
+            -var "project_id=${{ secrets.PROJECT_ID }}" \
+            -var "env_suffix=dev"
+
           terraform apply \
             -var "project_id=${{ secrets.PROJECT_ID }}" \
             -var "env_suffix=dev" \
