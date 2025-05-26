@@ -122,8 +122,7 @@ jobs:
             -lock-timeout=300s \
             -no-color \
             -detailed-exitcode \
-            -out=tfplan 
-            || [ $? -eq 2 ] || exit 1
+            -out=tfplan || TF_EXIT=$?
 
       # 13) PR へ Plan コメント
       - name: Comment plan to PR
