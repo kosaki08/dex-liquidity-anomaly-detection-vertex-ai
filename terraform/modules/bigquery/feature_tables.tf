@@ -21,6 +21,10 @@ resource "google_bigquery_table" "mart_pool_features" {
   }
 
   labels = var.common_labels
+
+  depends_on = [
+    google_bigquery_table.stg_pool_hourly_all
+  ]
 }
 
 # ラベル付き特徴量テーブル（学習用）
