@@ -19,3 +19,4 @@ jobs:
     with:
       workspace: prod
     secrets: inherit
+    environment: prod
