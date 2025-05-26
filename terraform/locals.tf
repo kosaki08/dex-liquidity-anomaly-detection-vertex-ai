@@ -17,14 +17,8 @@ locals {
   # モデル名
   model_name = var.model_name
 
-  # データバケット名
-  bucket_name = "${var.project_id}-data-${var.env_suffix}"
-
   # ローカルのモデル ZIP パス (存在チェック用)
   model_zip_path = abspath("${path.module}/../artifacts/${var.model_name}.zip")
-
-  # Terraform 実行時に impersonate する Service Account
-  impersonate_sa = "tf-apply-${var.env_suffix}@${var.project_id}.iam.gserviceaccount.com"
 
   # ラベル
   common_labels = {

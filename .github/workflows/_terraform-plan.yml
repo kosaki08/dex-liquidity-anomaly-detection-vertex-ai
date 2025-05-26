@@ -40,32 +40,37 @@ jobs:
             -backend-config="prefix=vertex-ai/${{ inputs.workspace }}" \
             -input=false
 
-      # 5) Terraform の検証
+      # 5) ワークスペースの指定
+      - name: Select workspace
+        working-directory: terraform
+        run: terraform workspace select dev
+
+      # 6) Terraform の検証
       - name: Validate Terraform
         working-directory: terraform
         run: terraform validate
 
-      # 6) Terraform のフォーマットチェック
+      # 7) Terraform のフォーマットチェック
       - name: Format Check
         working-directory: terraform
         run: terraform fmt -check
 
-      # 7) TFLint のセットアップ
+      # 8) TFLint のセットアップ
       - uses: terraform-linters/setup-tflint@v4
         with:
           tflint_version: v0.51.1
 
-      # 8) TFLint の初期化
+      # 9) TFLint の初期化
       - name: Init TFLint
         run: tflint --init
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      # 9) TFLint の実行
+      # 10) TFLint の実行
       - name: Run TFLint
         run: tflint --chdir terraform
 
-      # 10) Trivy IaC スキャン
+      # 11) Trivy IaC スキャン
       - name: Run Trivy IaC scanner
         id: trivy
         uses: aquasecurity/trivy-action@0.28.0
@@ -76,7 +81,7 @@ jobs:
           output: trivy-scan-result.txt
           exit-code: "0"
 
-      # 11) PR へ Trivy スキャン結果コメント
+      # 12) PR へ Trivy スキャン結果コメント
       - name: Comment Trivy scan result to PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6

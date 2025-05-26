@@ -5,8 +5,7 @@
     "context": ".."
   },
   "containerEnv": {
-    "REGION": "asia-northeast1",
-    "TF_WORKSPACE": "dev"
+    "REGION": "asia-northeast1"
   },
   "mounts": [
     "source=${localEnv:HOME}/.config/gcloud,target=/home/vscode/.config/gcloud,type=bind"

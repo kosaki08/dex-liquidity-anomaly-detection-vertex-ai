@@ -8,9 +8,9 @@ permissions:
   pull-requests: write # コメント用
 
 on:
-  pull_request:
+  push:
     branches: [main]
-    paths: ["infra/**"]
+    paths: ["terraform/**"]
   workflow_dispatch: # UI から手動トリガー可能
 
 jobs:
