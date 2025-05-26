@@ -36,8 +36,7 @@ jobs:
         working-directory: terraform
         run: |
           terraform init \
-            -backend-config="bucket=terraform-state-portfolio-vertex-ai-dex" \
-            -backend-config="prefix=vertex-ai/${{ inputs.workspace }}" \
+            -backend-config=envs/${{ inputs.workspace }}/backend.conf \
             -input=false \
             -reconfigure
 
