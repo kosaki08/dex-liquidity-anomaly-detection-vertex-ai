@@ -21,15 +21,15 @@ output "data_bucket_name" {
 # ---------- Feature Store 関連の output ----------
 output "featurestore_id" {
   description = "作成された Feature Store の ID"
-  value       = module.feature_store.featurestore_id
+  value       = var.enable_feature_store ? module.feature_store[0].featurestore_id : null
 }
 
 output "featurestore_name" {
   description = "作成された Feature Store の名前"
-  value       = module.feature_store.featurestore_name
+  value       = var.enable_feature_store ? module.feature_store[0].featurestore_name : null
 }
 
 output "entitytype_id" {
   description = "作成された Entity Type の ID"
-  value       = module.feature_store.entitytype_id
+  value       = var.enable_feature_store ? module.feature_store[0].entitytype_id : null
 }

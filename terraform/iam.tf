@@ -59,6 +59,7 @@ resource "google_project_iam_member" "vertex_pipeline_bq" {
 # ---------- Feature Store 関連の権限 ----------
 # Feature Store ユーザー権限
 resource "google_project_iam_member" "vertex_featurestore_user" {
+  count   = var.enable_feature_store ? 1 : 0
   project = local.project_id
   role    = "roles/aiplatform.featurestoreUser"
   member  = "serviceAccount:${local.sa["vertex"]}"
@@ -66,6 +67,7 @@ resource "google_project_iam_member" "vertex_featurestore_user" {
 
 # Feature Store 管理者権限
 resource "google_project_iam_member" "vertex_pipeline_featurestore_admin" {
+  count   = var.enable_feature_store ? 1 : 0
   project = local.project_id
   role    = "roles/aiplatform.featurestoreAdmin"
   member  = "serviceAccount:${local.sa["vertex-pipeline"]}"

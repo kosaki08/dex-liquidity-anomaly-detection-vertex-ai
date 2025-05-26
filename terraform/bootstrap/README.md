@@ -5,5 +5,4 @@ Cloud Storage バケットを CMEK で暗号化する場合は `service-<PROJECT
 
 ## TODO
 
-- `${project_id}-data-${env_suffix}` への objectAdmin 付与を import する
-  - `terraform/variables.tf` の変数を想定
+- `${project_id}-data-${env_suffix}` バケットは`modules/network` 側で自動作成 & IAM 付与まで完了するため import 不要。

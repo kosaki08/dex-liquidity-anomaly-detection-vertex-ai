@@ -29,7 +29,6 @@ jobs:
         with:
           workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
           service_account: tf-svc@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
-          audience: https://github.com/${{ github.repository }}
 
       # 3) Terraform をセットアップ
       - name: Setup Terraform
