@@ -33,6 +33,7 @@
         "mhutchie.git-graph",
         "esbenp.prettier-vscode",
         "foxundermoon.shell-format",
+        "github.vscode-github-actions",
         "hashicorp.terraform"
       ],
       "settings": {

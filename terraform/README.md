@@ -1,9 +1,9 @@
-## Terraform state のレイアウトとワークスペース運用について
+## ## Terraform state のレイアウト
 
 - **GCS バケット** :`gs://terraform-state-portfolio-vertex-ai-dex`
 
-  - dev → `vertex-ai/dev/dev.tfstate`
-  - prod → `vertex-ai/prod/prod.tfstate`
+  - **dev** : `gs://terraform-state-portfolio-vertex-ai-dex-dev/vertex-ai/dev/dev.tfstate`
+  - **prod**: `gs://terraform-state-portfolio-vertex-ai-dex-prod/vertex-ai/prod/prod.tfstate`
 
 - **default ワークスペースは使用しない**
   - `terraform workspace select dev|prod` を実行
