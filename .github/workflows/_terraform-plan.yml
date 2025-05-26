@@ -4,11 +4,23 @@ name: "_terraform-plan"
 on:
   workflow_call:
     inputs:
-      workspace: { required: true, type: string }
+      workspace:
+        required: true
+        type: string
 
 jobs:
   plan:
     runs-on: ubuntu-latest
+
+    # dev と prod で使う Project ID / Number をスイッチ
+    env:
+      PROJECT_ID: ${{ inputs.workspace == 'prod'
+        && secrets.PROD_PROJECT_ID
+        || secrets.DEV_PROJECT_ID }}
+      PROJECT_NUMBER: ${{ inputs.workspace == 'prod'
+        && secrets.PROD_PROJECT_NUMBER
+        || secrets.DEV_PROJECT_NUMBER }}
+
     concurrency:
       group: terraform-${{ inputs.workspace }}-plan # 同時実行防止
       cancel-in-progress: true # 古いプランのみキャンセル
@@ -17,13 +29,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) GCP 認証：Auth
+      # 2) GCP 認証
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
-          service_account: tf-apply-${{ inputs.workspace }}@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
-          project_id: ${{ secrets.PROJECT_ID }}
+          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
+          service_account: tf-apply-${{ inputs.workspace }}@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+          project_id: ${{ env.PROJECT_ID }}
 
       # 3) Terraform をセットアップ
       - name: Setup Terraform
@@ -31,7 +43,7 @@ jobs:
         with:
           terraform_version: 1.8.0
 
-      # 4) Terraform の初期化
+      # 4) Terraform 初期化
       - name: Initialize Terraform
         working-directory: terraform
         run: |
@@ -40,10 +52,10 @@ jobs:
             -input=false \
             -reconfigure
 
-      # 5) ワークスペースの指定
+      # 5) ワークスペース選択
       - name: Select workspace
         working-directory: terraform
-        run: terraform workspace select dev
+        run: terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }} # ★
 
       # 6) Terraform の検証
       - name: Validate Terraform
@@ -75,13 +87,13 @@ jobs:
         id: trivy
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          scan-type: "config"
-          scan-ref: "./terraform"
-          severity: "HIGH,CRITICAL"
+          scan-type: config
+          scan-ref: ./terraform
+          severity: HIGH,CRITICAL
           output: trivy-scan-result.txt
           exit-code: "0"
 
-      # 12) PR へ Trivy スキャン結果コメント
+      # 12) Trivy 結果コメント (PR のときだけ)
       - name: Comment Trivy scan result to PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
@@ -106,12 +118,13 @@ jobs:
         working-directory: terraform
         run: |
           terraform plan \
-            -var "project_id=${{ secrets.PROJECT_ID }}" \
+            -var "project_id=${{ env.PROJECT_ID }}" \
             -var "env_suffix=${{ inputs.workspace }}" \
             -lock-timeout=300s \
             -no-color \
             -detailed-exitcode \
-            -out=tfplan || [ $? -eq 2 ] || exit 1
+            -out=tfplan 
+            || [ $? -eq 2 ] || exit 1
 
       # 13) PR へ Plan コメント
       - name: Comment plan to PR
