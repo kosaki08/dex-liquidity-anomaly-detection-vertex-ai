@@ -18,7 +18,8 @@ local-dev:  ## ローカル開発環境での認証設定: 通常の gcloud auth
 
 # ---------- 一般コマンド ----------
 init:  ## terraform init $(INIT_FLAGS)
-	terraform init "$(BACKEND_CFG)" $(INIT_FLAGS)
+	terraform init $(BACKEND_CFG) $(INIT_FLAGS)
+	terraform workspace select $(WORKSPACE) || terraform workspace new $(WORKSPACE)
 
 plan: ## terraform plan
 	terraform plan -var-file="$(VAR_FILE)"
