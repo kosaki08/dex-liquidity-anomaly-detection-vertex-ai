@@ -1,6 +1,10 @@
+locals {
+  state_bucket_name = var.state_bucket
+}
+
 # ステートバケットの権限付与
 resource "google_storage_bucket_iam_member" "tf_sa_state_bucket" {
-  bucket = google_storage_bucket.tf_state.name
+  bucket = local.state_bucket_name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.tf_apply.email}"
 }
@@ -14,7 +18,7 @@ resource "google_project_iam_member" "tf_sa_viewer" {
 
 # データバケットの bucket-level 権限
 resource "google_storage_bucket_iam_member" "tf_sa_state_bucket_reader" {
-  bucket = google_storage_bucket.tf_state.name
+  bucket = local.state_bucket_name
   role   = "roles/storage.legacyBucketReader"
   member = "serviceAccount:${google_service_account.tf_apply.email}"
 }

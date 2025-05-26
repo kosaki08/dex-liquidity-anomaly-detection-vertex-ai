@@ -21,6 +21,14 @@ terraform plan
 ```
 
 - **prod** 環境を触るときは同じ手順で `envs/prod/backend.conf` と `prod` を指定。
+- prod 環境を使う前に bootstrap を prod で apply して SA / Workload Identity を用意しておく
+
+### ワークスペースと SA の対応関係
+
+```
+dev   → tf-apply-dev
+prod  → tf-apply-prod
+```
 
 ---
 

@@ -30,7 +30,8 @@ resource "google_storage_bucket" "tf_state" {
   uniform_bucket_level_access = true
 
   depends_on = [
-    google_project_service.services
+    google_project_service.services,
+    google_kms_crypto_key_iam_member.gcs_object_encrypter
   ]
 }
 
@@ -69,4 +70,11 @@ resource "google_kms_crypto_key_iam_member" "terraform_state_encrypter" {
   crypto_key_id = google_kms_crypto_key.terraform_state.id
   role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
   member        = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
+# Cloud Storage サービスアカウントに KMS 使用権限を付与
+resource "google_kms_crypto_key_iam_member" "gcs_object_encrypter" {
+  crypto_key_id = google_kms_crypto_key.terraform_state.id
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:service-${var.project_number}@gs-project-accounts.iam.gserviceaccount.com"
 }

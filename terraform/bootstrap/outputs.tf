@@ -5,5 +5,5 @@ output "tf_apply_sa_email" {
 
 output "state_bucket" {
   description = "Terraform state バケット名"
-  value       = google_storage_bucket.tf_state.name
+  value       = var.state_bucket
 }
