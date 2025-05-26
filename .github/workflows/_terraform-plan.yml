@@ -33,9 +33,9 @@ jobs:
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
-          service_account: tf-apply-${{ inputs.workspace }}@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
-          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
+          service_account: tf-apply-${{ inputs.workspace }}@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
+          project_id: ${{ secrets.PROJECT_ID }}
 
       # 3) Terraform をセットアップ
       - name: Setup Terraform
@@ -55,7 +55,7 @@ jobs:
       # 5) ワークスペース選択
       - name: Select workspace
         working-directory: terraform
-        run: terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }} # ★
+        run: terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
 
       # 6) Terraform の検証
       - name: Validate Terraform
