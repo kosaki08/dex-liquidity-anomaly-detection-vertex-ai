@@ -8,9 +8,6 @@ locals {
   # 環境を区別するサフィックス
   env_suffix = var.env_suffix
 
-  # データセット名
-  dataset_id = "${lower(var.dataset_prefix)}_raw_${var.env_suffix}"
-
   # サービスアカウント
   sa = module.service_accounts.emails
 

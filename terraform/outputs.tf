@@ -1,6 +1,6 @@
 output "bigquery_dataset_id" {
   description = "作成された BigQuery データセットの ID"
-  value       = module.bigquery.bigquery_dataset.id
+  value       = module.bigquery.raw_dataset_id
 }
 
 output "vertex_ai_endpoint_id" {

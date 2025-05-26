@@ -27,6 +27,12 @@ variable "env_suffix" {
   default     = "dev"
 }
 
+variable "kms_key_name" {
+  description = "BigQuery暗号化用のCloud KMSキー名"
+  type        = string
+  default     = null
+}
+
 # # ---------- Feature Store 関連の変数 ----------
 variable "enable_feature_store" {
   type        = bool
