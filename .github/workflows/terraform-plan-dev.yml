@@ -19,3 +19,4 @@ jobs:
     with:
       workspace: dev
     secrets: inherit
+    environment: dev
