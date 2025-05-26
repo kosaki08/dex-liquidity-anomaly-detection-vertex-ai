@@ -13,13 +13,9 @@ jobs:
     runs-on: ubuntu-latest
 
     # dev と prod で使う Project ID / Number をスイッチ
-    env:
-      PROJECT_ID: ${{ inputs.workspace == 'prod'
-        && secrets.PROD_PROJECT_ID
-        || secrets.DEV_PROJECT_ID }}
-      PROJECT_NUMBER: ${{ inputs.workspace == 'prod'
-        && secrets.PROD_PROJECT_NUMBER
-        || secrets.DEV_PROJECT_NUMBER }}
+    secrets:
+      PROJECT_ID: { required: true }
+      PROJECT_NUMBER: { required: true }
 
     concurrency:
       group: terraform-${{ inputs.workspace }}-plan # 同時実行防止

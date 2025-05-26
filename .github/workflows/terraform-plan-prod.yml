@@ -18,5 +18,6 @@ jobs:
     uses: ./.github/workflows/_terraform-plan.yml
     with:
       workspace: prod
-    secrets: inherit
-    environment: prod
+    secrets:
+      PROJECT_ID: ${{ secrets.PROD_PROJECT_ID }}
+      PROJECT_NUMBER: ${{ secrets.PROD_PROJECT_NUMBER }}
