@@ -27,6 +27,19 @@ variable "env_suffix" {
   default     = "dev"
 }
 
+variable "model_image_uri" {
+  type        = string
+  description = "カスタムモデルのコンテナイメージ URI"
+  default     = "asia-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest"
+}
+
+
+variable "kms_key_name" {
+  description = "BigQuery暗号化用のCloud KMSキー名"
+  type        = string
+  default     = null
+}
+
 # # ---------- Feature Store 関連の変数 ----------
 variable "enable_feature_store" {
   type        = bool
