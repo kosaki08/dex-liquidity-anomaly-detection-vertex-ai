@@ -4,20 +4,12 @@ resource "google_bigquery_table" "mart_pool_features" {
   table_id   = "mart_pool_features"
   project    = var.project_id
 
-  time_partitioning {
-    type  = "DAY"
-    field = "hour_ts"
-  }
-
-  clustering = ["dex_protocol", "pool_id"]
-
-  materialized_view {
+  view {
     query = templatefile("${path.module}/sql/features/mart_pool_features.sql", {
       project_id      = var.project_id
       staging_dataset = google_bigquery_dataset.dex_staging.dataset_id
     })
-    enable_refresh      = true
-    refresh_interval_ms = 21600000 # 6時間ごと
+    use_legacy_sql = false
   }
 
   labels = var.common_labels
