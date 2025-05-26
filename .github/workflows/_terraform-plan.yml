@@ -38,7 +38,8 @@ jobs:
           terraform init \
             -backend-config="bucket=terraform-state-portfolio-vertex-ai-dex" \
             -backend-config="prefix=vertex-ai/${{ inputs.workspace }}" \
-            -input=false
+            -input=false \
+            -reconfigure
 
       # 5) ワークスペースの指定
       - name: Select workspace
