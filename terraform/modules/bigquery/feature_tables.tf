@@ -1,4 +1,4 @@
-# プール特徴量テーブル（マテリアライズドビュー）
+# プール特徴量テーブル
 resource "google_bigquery_table" "mart_pool_features" {
   dataset_id = google_bigquery_dataset.dex_features.dataset_id
   table_id   = "mart_pool_features"
