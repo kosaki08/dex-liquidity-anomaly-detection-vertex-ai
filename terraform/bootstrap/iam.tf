@@ -38,6 +38,8 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
     "roles/resourcemanager.projectIamAdmin", # プロジェクトレベルIAM管理
     "roles/serviceusage.serviceUsageAdmin",  # API有効化
     "roles/compute.networkAdmin",            # VPC管理
+    "roles/notebooks.admin",                 # Workbench 作成用
+    "roles/iam.serviceAccountUser",          # 任意 SA をアタッチするため
     "roles/aiplatform.admin",                # Vertex AI管理
     "roles/bigquery.admin",                  # BigQuery管理
     "roles/secretmanager.admin",             # シークレットマネージャー管理
@@ -52,5 +54,12 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
 resource "google_service_account_iam_member" "tf_sa_token_creator" {
   service_account_id = google_service_account.tf_apply.name
   role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
+# tf-apply SA が run-vertex-pipeline-${var.env_suffix} を impersonate できるように
+resource "google_service_account_iam_member" "tf_apply_can_use_vertex_pipeline_sa" {
+  service_account_id = "projects/${var.project_id}/serviceAccounts/run-vertex-pipeline-${var.env_suffix}@${var.project_id}.iam.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.tf_apply.email}"
 }
