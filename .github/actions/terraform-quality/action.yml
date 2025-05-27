@@ -1,0 +1,61 @@
+name: "Terraform Quality Checks"
+description: "validate / fmt / TFLint / Trivy (IaC)"
+inputs:
+  workdir:
+    description: "Terraform root dir"
+    required: true
+    default: terraform
+runs:
+  using: "composite"
+  steps:
+    # 1) Terraform の構文チェック
+    - name: Validate Terraform
+      working-directory: ${{ inputs.workdir }}
+      run: terraform validate
+
+    # 2) Terraform コードのフォーマットチェック
+    - name: Check Terraform Format
+      working-directory: ${{ inputs.workdir }}
+      run: terraform fmt -check
+
+    # 3) TFLint のセットアップ
+    - name: Setup TFLint
+      uses: terraform-linters/setup-tflint@v4
+      with:
+        tflint_version: v0.51.1
+
+    # 4) TFLint 初期化
+    - name: Initialize TFLint
+      run: tflint --init --chdir ${{ inputs.workdir }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+    # 5) TFLint 実行
+    - name: Run TFLint
+      run: tflint --chdir ${{ inputs.workdir }}
+
+    # 6) Trivy IaC スキャン
+    - name: Run Trivy Scan
+      id: trivy
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        scan-type: config
+        scan-ref: ./${{ inputs.workdir }}
+        severity: HIGH,CRITICAL
+        output: trivy-scan-result.txt
+        exit-code: "0"
+
+    # 7) PR へのスキャン結果コメント
+    - name: Comment Trivy scan result to PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          let body = fs.readFileSync('trivy-scan-result.txt', 'utf8').trim();
+          if (!body) body = 'Trivy scan: 検出なし🎉';
+          await github.rest.issues.createComment({
+            ...context.repo,
+            issue_number: context.issue.number,
+            body,
+          });
