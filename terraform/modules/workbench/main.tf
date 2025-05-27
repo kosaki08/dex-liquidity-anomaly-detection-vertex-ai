@@ -5,7 +5,7 @@ resource "google_workbench_instance" "this" {
 
   # GCE 設定
   gce_setup {
-    machine_type = "e2-medium	" # 2 vCPU, 4GB RAM
+    machine_type = "e2-medium" # 2 vCPU, 4GB RAM
 
     # ブートディスク
     boot_disk {
