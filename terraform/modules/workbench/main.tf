@@ -1,7 +1,7 @@
 resource "google_workbench_instance" "this" {
   name     = "wb-${var.env_suffix}"
   project  = var.project_id
-  location = var.region
+  location = var.zone
 
   # GCE 設定
   gce_setup {

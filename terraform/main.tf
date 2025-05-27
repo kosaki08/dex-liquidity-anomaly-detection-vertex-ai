@@ -130,7 +130,7 @@ module "feature_store" {
 module "workbench" {
   source            = "./modules/workbench"
   project_id        = local.project_id
-  region            = local.region
+  zone              = var.workbench_zone
   env_suffix        = local.env_suffix # dev / prod
   network_self_link = module.network.network_self_link
   subnet_self_link  = module.network.subnetwork_self_link
