@@ -55,6 +55,7 @@ jobs:
         working-directory: terraform
         run: |
           terraform apply \
+            -var-file=envs/prod/terraform.tfvars \
             -var "project_id=${{ secrets.PROJECT_ID }}" \
             -var "env_suffix=prod" \
             -input=false \

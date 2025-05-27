@@ -32,6 +32,7 @@ module "network" {
 
 
 # データバケット
+#tfsec:ignore:AVD-GCP-0066  dev環境はGoogle-managed暗号化で許容
 resource "google_storage_bucket" "data_bucket" {
   name = "${local.project_id}-data-${local.env_suffix}"
   labels = {
@@ -52,6 +53,15 @@ resource "google_storage_bucket" "data_bucket" {
     }
     condition {
       age = 365 # 365 日後に削除
+    }
+  }
+
+  # 暗号化
+  dynamic "encryption" {
+    for_each = var.env_suffix == "prod" && var.kms_key_name != null ? [1] : [] # prod 環境で KMS キーが設定されている場合のみ暗号化
+    content {
+      # デフォルトの KMS キーを設定
+      default_kms_key_name = var.kms_key_name
     }
   }
 
