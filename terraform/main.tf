@@ -2,10 +2,10 @@
 resource "google_project_service" "services" {
   for_each = toset([
     "bigquery.googleapis.com",
-    "composer.googleapis.com",
     "aiplatform.googleapis.com",
     "artifactregistry.googleapis.com",
-    "storage.googleapis.com",        # Composer/BigQuery バケット用
+    "storage.googleapis.com",        # BigQuery バケット用
+    "notebooks.googleapis.com",      # Vertex AI Notebook 用
     "compute.googleapis.com",        # VPC ネットワーク用
     "vpcaccess.googleapis.com",      # Serverless VPC Access Connector 用
     "iamcredentials.googleapis.com", # サービスアカウント用
@@ -123,6 +123,21 @@ module "feature_store" {
 
   depends_on = [
     google_project_service.services["aiplatform.googleapis.com"],
+  ]
+}
+
+# Notebook / Vertex AI Workbench
+module "workbench" {
+  source            = "./modules/workbench"
+  project_id        = local.project_id
+  region            = local.region
+  env_suffix        = local.env_suffix # dev / prod
+  network_self_link = module.network.network_self_link
+  subnet_self_link  = module.network.subnetwork_self_link
+  sa_email          = module.service_accounts.emails["vertex-pipeline"]
+
+  depends_on = [
+    google_project_service.services["notebooks.googleapis.com"]
   ]
 }
 
