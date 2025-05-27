@@ -1,0 +1,102 @@
+name: "_bootstrap-terraform"
+
+on:
+  workflow_call:
+    inputs:
+      workspace:
+        required: true
+        type: string # dev / prod
+      environment:
+        required: true
+        type: string # dev / prod
+      command:
+        required: true
+        type: string # plan / apply
+    secrets:
+      PROJECT_ID: { required: true }
+      PROJECT_NUMBER: { required: true }
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: bootstrap-${{ inputs.workspace }}-${{ inputs.command }}
+      cancel-in-progress: ${{ inputs.command == 'plan' }}
+    steps:
+      # 1) リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2) GCP 認証
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
+          service_account: tf-apply-${{ inputs.workspace }}@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
+          project_id: ${{ secrets.PROJECT_ID }}
+
+      # 3) Terraform をセットアップ
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: 1.8.0
+
+      # 4) Terraform 初期化
+      - name: Initialize Terraform
+        working-directory: terraform/bootstrap
+        run: |
+          terraform init \
+            -backend-config=envs/${{ inputs.workspace }}/backend.conf \
+            -input=false -reconfigure
+
+      # 5) ワークスペース選択
+      - name: Select workspace
+        working-directory: terraform/bootstrap
+        run: terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
+
+      # 6) Terraform Quality (validate / fmt / TFLint / Trivy)
+      - name: Terraform Quality
+        uses: ./.github/actions/terraform-quality
+        with:
+          workdir: terraform/bootstrap
+
+      # 7-A) PLAN
+      - name: Terraform Plan
+        if: inputs.command == 'plan'
+        working-directory: terraform/bootstrap
+        run: |
+          set -e
+          terraform plan \
+            -var-file=envs/${{ inputs.workspace }}/terraform.tfvars \
+            -var "project_id=${{ secrets.PROJECT_ID }}" \
+            -var "env_suffix=${{ inputs.workspace }}" \
+            -lock-timeout=300s \
+            -no-color \
+            -detailed-exitcode -out=tfplan || exit_code=$?
+          # exit_code=2 は変更あり、0 は差分なし、1 はエラー
+          if [ "${exit_code:-0}" -eq 1 ]; then
+            echo "Terraform plan failed"; exit 1
+          fi
+
+      # 7-B) APPLY
+      - name: Terraform Apply
+        if: inputs.command == 'apply'
+        working-directory: terraform/bootstrap
+        run: |
+          terraform apply \
+            -var-file=envs/${{ inputs.workspace }}/terraform.tfvars \
+            -var "project_id=${{ secrets.PROJECT_ID }}" \
+            -var "env_suffix=${{ inputs.workspace }}" \
+            -auto-approve \
+            -lock-timeout=300s
+
+      # 8) PR へ Plan コメント
+      - name: Comment plan to PR
+        if: ${{ github.event_name == 'pull_request' && inputs.command == 'plan' }}
+        uses: borchero/terraform-plan-comment@v2
+        with:
+          token: ${{ github.token }}
+          planfile: tfplan
+          working-directory: terraform/bootstrap
+          header: "Bootstrap Terraform Plan (${{ inputs.workspace }})"
