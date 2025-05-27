@@ -27,7 +27,7 @@ resource "google_workbench_instance" "this" {
     # VM イメージ
     vm_image {
       project = "deeplearning-platform-release"
-      family  = "tf-2-15-cpu"
+      family  = "tf-latest-cpu"
     }
 
     # IP 転送
