@@ -7,6 +7,8 @@ AUTOAPPROVE ?=
 INIT_FLAGS  ?=
 # バックエンド設定ファイル
 BACKEND_CFG := -backend-config=envs/$(WORKSPACE)/backend.conf
+# 変数ファイル
+VAR_FILE := envs/$(WORKSPACE)/terraform.tfvars
 
 .PHONY: local-dev
 
@@ -30,16 +32,16 @@ init:  ## terraform init $(INIT_FLAGS)
 	terraform workspace select $(WORKSPACE) || terraform workspace new $(WORKSPACE)
 
 plan: ## terraform plan
-	terraform plan
+	terraform plan -var-file="$(VAR_FILE)"
 
 validate: ## terraform validate
 	terraform validate
 
 apply: guard-prod ## terraform apply $(AUTOAPPROVE)
-	terraform apply $(AUTOAPPROVE)
+	terraform apply -var-file="$(VAR_FILE)" $(AUTOAPPROVE)
 
 destroy: guard-prod ## terraform destroy
-	terraform destroy
+	terraform destroy -var-file="$(VAR_FILE)"
 
 help:  ## ヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

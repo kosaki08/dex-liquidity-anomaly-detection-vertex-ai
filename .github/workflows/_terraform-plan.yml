@@ -117,6 +117,7 @@ jobs:
         working-directory: terraform
         run: |
           terraform plan \
+            -var-file=envs/${{ inputs.workspace }}/terraform.tfvars \
             -var "project_id=${{ secrets.PROJECT_ID }}" \
             -var "env_suffix=${{ inputs.workspace }}" \
             -lock-timeout=300s \

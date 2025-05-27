@@ -3,10 +3,10 @@ variable "project_id" {
   description = "GCP プロジェクト ID"
 }
 
-variable "region" {
+variable "zone" {
   type        = string
-  description = "リソースを作成するリージョン"
-  default     = "asia-northeast1"
+  description = "Workbench を置く GCE ゾーン"
+  default     = "asia-northeast1-a"
 }
 
 variable "env_suffix" {

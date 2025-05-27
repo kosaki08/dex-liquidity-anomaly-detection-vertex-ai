@@ -40,8 +40,8 @@ terraform.tfstate.backup
 # Terraform variables
 *.tfvars
 *.tfvars.json
-!terraform/envs/dev/dev.auto.tfvars
-!terraform/envs/prod/prod.auto.tfvars
+!terraform/envs/dev/terraform.tfvars
+!terraform/envs/prod/terraform.tfvars
 
 # Terraform override files
 override.tf
