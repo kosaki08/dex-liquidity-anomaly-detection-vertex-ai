@@ -1,0 +1,22 @@
+name: "Bootstrap Plan (prod)"
+
+# パーミッション設定
+permissions:
+  contents: read # ソースチェックアウト用
+  id-token: write # OIDC トークン発行用
+  pull-requests: write # コメント用
+
+on:
+  push:
+    branches: [main]
+    paths: ["terraform/bootstrap/**"]
+  workflow_dispatch: # UI から手動トリガー可能
+
+jobs:
+  call:
+    uses: ./.github/workflows/_bootstrap-terraform.yml
+    with:
+      workspace: prod
+      environment: prod
+      command: plan
+    secrets: inherit
