@@ -33,7 +33,12 @@ variable "kms_key_name" {
   default     = null
 }
 
-# # ---------- Feature Store 関連の変数 ----------
+variable "workbench_zone" {
+  description = "Workbench を置く GCE ゾーン"
+  type        = string
+}
+
+# ---------- Feature Store 関連の変数 ----------
 variable "enable_feature_store" {
   type        = bool
   description = "Feature Store を有効にするかどうか"
