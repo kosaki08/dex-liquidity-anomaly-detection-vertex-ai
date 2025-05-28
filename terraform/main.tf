@@ -169,6 +169,64 @@ resource "google_storage_bucket_object" "model_artifact" {
   content_type = "application/zip"
 }
 
+# Uniswap フェッチャー
+module "fetcher_job_uniswap" {
+  source                = "./modules/cloud_run_job"
+  project_id            = local.project_id
+  name                  = "dex-fetch-uni-${local.env_suffix}"
+  region                = local.region
+  image_uri             = "${local.region}-docker.pkg.dev/${local.project_id}/ml/fetcher:latest"
+  secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
+  service_account       = module.service_accounts.emails["vertex"]
+  vpc_connector         = module.network.connector_id
+  env_vars = {
+    PROJECT_ID                    = local.project_id
+    ENV_SUFFIX                    = local.env_suffix
+    RAW_BUCKET                    = google_storage_bucket.data_bucket.name
+    PROTOCOL                      = "uniswap"
+    THE_GRAPH_UNISWAP_SUBGRAPH_ID = "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
+  }
+}
+
+# Uniswap フェッチャースケジュール
+module "fetcher_schedule_uniswap" {
+  source         = "./modules/cloud_scheduler"
+  name           = "dex-fetch-uniswap-${local.env_suffix}"
+  region         = local.region
+  schedule       = "0 * * * *"
+  job_name       = module.fetcher_job_uniswap.job_name
+  oauth_sa_email = module.service_accounts.emails["vertex"]
+}
+
+# Sushiswap フェッチャー
+module "fetcher_job_sushiswap" {
+  source                = "./modules/cloud_run_job"
+  project_id            = local.project_id
+  name                  = "dex-fetch-sushi-${local.env_suffix}"
+  region                = local.region
+  image_uri             = "${local.region}-docker.pkg.dev/${local.project_id}/ml/fetcher:latest"
+  secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
+  service_account       = module.service_accounts.emails["vertex"]
+  vpc_connector         = module.network.connector_id
+  env_vars = {
+    PROJECT_ID                      = local.project_id
+    ENV_SUFFIX                      = local.env_suffix
+    RAW_BUCKET                      = google_storage_bucket.data_bucket.name
+    PROTOCOL                        = "sushiswap"
+    THE_GRAPH_SUSHISWAP_SUBGRAPH_ID = "5nnoU1nUFeWqtXgbpC54L9PWdpgo7Y9HYinR3uTMsfzs"
+  }
+}
+
+# Sushiswap フェッチャースケジュール
+module "fetcher_schedule_sushiswap" {
+  source         = "./modules/cloud_scheduler"
+  name           = "dex-fetch-sushiswap-${local.env_suffix}"
+  region         = local.region
+  schedule       = "0 * * * *"
+  job_name       = module.fetcher_job_sushiswap.job_name
+  oauth_sa_email = module.service_accounts.emails["vertex"]
+}
+
 # ワークロード
 module "workloads" {
   source     = "./workloads"
