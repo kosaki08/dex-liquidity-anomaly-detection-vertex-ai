@@ -7,6 +7,10 @@ resource "google_cloud_run_v2_job" "this" {
 
   deletion_protection = var.deletion_protection
 
+  # TODO: リソース設定強化
+  # cpu / memory limits
+  # concurrency の明示
+
   template {
     template {
       service_account = var.service_account

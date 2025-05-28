@@ -72,3 +72,6 @@ resource "google_project_iam_member" "vertex_pipeline_featurestore_admin" {
   role    = "roles/aiplatform.featurestoreAdmin"
   member  = "serviceAccount:${local.sa["vertex-pipeline"]}"
 }
+
+# TODO: Cloud Run Job 用 SA 権限見直し
+# run-vertex-*, run-vertex-pipeline-* には roles/run.invoker + 必要最小の Storage / Secret だけに絞る。
