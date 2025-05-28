@@ -1,0 +1,64 @@
+name: Cloud Build CI/CD
+
+on:
+  push:
+    branches: [dev] # dev ブランチ push で自動適用
+  workflow_dispatch: # UI から手動トリガー可能
+    inputs:
+      workspace:
+        description: "dev or prod"
+        required: true
+        default: "prod"
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+# パーミッション設定
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cloud_build:
+    runs-on: ubuntu-latest
+
+    env:
+      ENV: ${{ github.event.inputs.workspace || 'dev' }}
+      PROJECT_ID: ${{ secrets.PROJECT_ID }}
+      REGION: asia-northeast1
+      ARTIFACTS_BUCKET: ${{ secrets.ARTIFACTS_BUCKET }}
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      # 1) リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2) GCP 認証：Auth
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
+          service_account: tf-svc@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
+          audience: https://github.com/${{ github.repository }}
+
+      # 3) gcloud CLI をセットアップ
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.PROJECT_ID }}
+
+      # 4) Cloud Build で Docker build & push
+      - name: Trigger Cloud Build
+        run: |
+          WS=${{ github.event.inputs.workspace || 'dev' }}
+          gcloud builds submit \
+            --config cloudbuild.yaml \
+            --substitutions=_REGION=${{ env.REGION }},_PROJECT_ID=${{ secrets.PROJECT_ID }},_REPO=ml,_IMAGE_TAG=${{ github.sha }}
+
+      # 5) Smoke Test（dev のみ）
+      - name: Smoke test fetcher job
+        if: env.ENV == 'dev'
+        run: |
+          gcloud run jobs execute dex-fetch-uni-dev \
+            --region=${{ env.REGION }} --wait
