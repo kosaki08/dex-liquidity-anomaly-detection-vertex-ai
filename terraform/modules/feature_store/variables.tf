@@ -36,24 +36,24 @@ variable "aiplatform_service_dependency" {
   default     = null
 }
 
-# Phase 1: 基本的な特徴量のみ
 variable "basic_features" {
   description = "基本的な特徴量定義（monitoring設定なし）"
   type = map(object({
     value_type = string
   }))
   default = {
-    "liquidity_volume_24h" = {
-      value_type = "DOUBLE"
-    }
-    "price_volatility" = {
-      value_type = "DOUBLE"
-    }
-    "transaction_count" = {
-      value_type = "INT64"
-    }
-    "pool_total_value_locked" = {
-      value_type = "DOUBLE"
-    }
+    "volume_usd"    = { value_type = "DOUBLE" }
+    "tvl_usd"       = { value_type = "DOUBLE" }
+    "liquidity"     = { value_type = "DOUBLE" }
+    "tx_count"      = { value_type = "INT64" }
+    "vol_rate_24h"  = { value_type = "DOUBLE" }
+    "tvl_rate_24h"  = { value_type = "DOUBLE" }
+    "vol_ma_6h"     = { value_type = "DOUBLE" }
+    "vol_ma_24h"    = { value_type = "DOUBLE" }
+    "vol_std_24h"   = { value_type = "DOUBLE" }
+    "vol_tvl_ratio" = { value_type = "DOUBLE" }
+    "volume_zscore" = { value_type = "DOUBLE" }
+    "hour_of_day"   = { value_type = "INT64" }
+    "day_of_week"   = { value_type = "INT64" }
   }
 }
