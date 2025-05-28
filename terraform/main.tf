@@ -181,6 +181,7 @@ module "fetcher_job_uniswap" {
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
   vpc_connector         = module.network.connector_id
+  deletion_protection   = var.env_suffix == "prod" ? true : false # prod 環境では削除保護
   env_vars = {
     PROJECT_ID                    = local.project_id
     ENV_SUFFIX                    = local.env_suffix
@@ -214,6 +215,7 @@ module "fetcher_job_sushiswap" {
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
   vpc_connector         = module.network.connector_id
+  deletion_protection   = var.env_suffix == "prod" ? true : false # prod 環境では削除保護
   env_vars = {
     PROJECT_ID                      = local.project_id
     ENV_SUFFIX                      = local.env_suffix
