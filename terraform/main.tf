@@ -9,7 +9,9 @@ resource "google_project_service" "services" {
     "compute.googleapis.com",        # VPC ネットワーク用
     "vpcaccess.googleapis.com",      # Serverless VPC Access Connector 用
     "iamcredentials.googleapis.com", # サービスアカウント用
-    "secretmanager.googleapis.com"   # シークレットマネージャー用
+    "secretmanager.googleapis.com",  # シークレットマネージャー用
+    "run.googleapis.com",            # Cloud Run Job 用
+    "cloudscheduler.googleapis.com", # Cloud Scheduler 用
   ])
   service = each.key
 }
@@ -186,6 +188,9 @@ module "fetcher_job_uniswap" {
     PROTOCOL                      = "uniswap"
     THE_GRAPH_UNISWAP_SUBGRAPH_ID = "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
   }
+  depends_on = [
+    google_project_service.services["run.googleapis.com"]
+  ]
 }
 
 # Uniswap フェッチャースケジュール
@@ -196,6 +201,7 @@ module "fetcher_schedule_uniswap" {
   schedule       = "0 * * * *"
   job_name       = module.fetcher_job_uniswap.job_name
   oauth_sa_email = module.service_accounts.emails["vertex"]
+  depends_on     = [module.fetcher_job_uniswap]
 }
 
 # Sushiswap フェッチャー
@@ -215,6 +221,9 @@ module "fetcher_job_sushiswap" {
     PROTOCOL                        = "sushiswap"
     THE_GRAPH_SUSHISWAP_SUBGRAPH_ID = "5nnoU1nUFeWqtXgbpC54L9PWdpgo7Y9HYinR3uTMsfzs"
   }
+  depends_on = [
+    google_project_service.services["run.googleapis.com"]
+  ]
 }
 
 # Sushiswap フェッチャースケジュール
@@ -225,6 +234,7 @@ module "fetcher_schedule_sushiswap" {
   schedule       = "0 * * * *"
   job_name       = module.fetcher_job_sushiswap.job_name
   oauth_sa_email = module.service_accounts.emails["vertex"]
+  depends_on     = [module.fetcher_job_sushiswap]
 }
 
 # ワークロード
