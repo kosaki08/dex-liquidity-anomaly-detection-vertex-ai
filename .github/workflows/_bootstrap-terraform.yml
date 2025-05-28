@@ -57,13 +57,14 @@ jobs:
       # 5) tfvars を生成
       - name: Render tfvars
         working-directory: terraform/bootstrap
-        run: |
-          WS=${{ inputs.workspace }}
-          mkdir -p envs/${WS}
-          envsubst < envs/${WS}/terraform.tfvars.tmpl \
-            > envs/${WS}/terraform.tfvars
         env:
-          TF_ENABLE_FEATURE_STORE: ${{ secrets.TF_ENABLE_FEATURE_STORE || 'false' }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          PROJECT_NUMBER: ${{ secrets.PROJECT_NUMBER }}
+          WS: ${{ inputs.workspace }}
+        run: |
+          set -euo pipefail
+          mkdir -p envs/$WS
+          envsubst < envs/$WS/terraform.tfvars.tmpl > envs/$WS/terraform.tfvars
 
       # 6) ワークスペース選択
       - name: Select workspace
