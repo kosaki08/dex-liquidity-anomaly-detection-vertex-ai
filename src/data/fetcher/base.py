@@ -78,7 +78,7 @@ class BaseFetcher:
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("w", encoding="utf-8") as f:
             for rec in records:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                f.write(json.dumps({"raw": rec}, ensure_ascii=False) + "\n")
         logging.info(f"[{self.name}] saved {len(records)} to {output_path}")
 
     def run(self, output_path: str, interval_end_iso: str) -> None:

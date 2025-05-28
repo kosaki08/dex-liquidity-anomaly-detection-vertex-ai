@@ -32,12 +32,6 @@ variable "github_repository" {
   default     = "kosaki08/dex-liquidity-anomaly-detection-vertex-ai"
 }
 
-variable "allowed_branches" {
-  description = "許可するブランチ一覧"
-  type        = list(string)
-  default     = ["refs/heads/main", "refs/heads/develop"]
-}
-
 variable "github_organization" {
   description = "GitHub organization名"
   type        = string
