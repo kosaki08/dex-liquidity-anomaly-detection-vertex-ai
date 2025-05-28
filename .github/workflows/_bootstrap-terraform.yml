@@ -56,7 +56,7 @@ jobs:
 
       # 5) tfvars を生成
       - name: Render tfvars
-        working-directory: ${{ github.workspace }}/terraform${{ inputs.subdir }}
+        working-directory: terraform/bootstrap
         run: |
           WS=${{ inputs.workspace }}
           mkdir -p envs/${WS}
