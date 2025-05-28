@@ -5,6 +5,8 @@ resource "google_cloud_run_v2_job" "this" {
   location = var.region
   project  = data.google_client_config.this.project
 
+  deletion_protection = var.deletion_protection
+
   template {
     template {
       service_account = var.service_account

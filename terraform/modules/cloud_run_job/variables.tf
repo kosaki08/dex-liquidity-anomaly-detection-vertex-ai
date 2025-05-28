@@ -37,3 +37,9 @@ variable "vpc_connector" {
   type        = string
   description = "VPCコネクタの名前"
 }
+
+variable "deletion_protection" {
+  type        = bool
+  description = "Cloud Run Job の削除保護"
+  default     = true
+}
