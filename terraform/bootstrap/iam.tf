@@ -44,6 +44,7 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
     "roles/secretmanager.admin",             # シークレットマネージャー管理
     "roles/compute.securityAdmin",           # ファイアウォール更新用
     "roles/run.admin",                       # Cloud Run Job 管理
+    "roles/cloudscheduler.admin",            # Cloud Scheduler 管理
   ])
   project = var.project_id
   role    = each.value
