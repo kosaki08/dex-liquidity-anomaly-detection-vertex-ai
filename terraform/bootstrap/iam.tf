@@ -75,3 +75,10 @@ resource "google_service_account_iam_member" "tf_apply_use_vertex_pipeline_sa" {
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.tf_apply.email}"
 }
+
+# Cloud Run Jobs の権限付与
+resource "google_project_iam_member" "tf_sa_run_jobs" {
+  project = var.project_id
+  role    = "roles/run.developer"
+  member  = "serviceAccount:${google_service_account.tf_apply.email}"
+}
