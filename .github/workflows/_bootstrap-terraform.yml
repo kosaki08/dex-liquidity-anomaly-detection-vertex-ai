@@ -9,6 +9,10 @@ on:
       environment:
         required: true
         type: string # dev / prod
+      subdir:
+        required: false
+        type: string
+        default: "" # ルートディレクトリを指す
       command:
         required: true
         type: string # plan / apply
@@ -50,18 +54,29 @@ jobs:
             -backend-config=envs/${{ inputs.workspace }}/backend.conf \
             -input=false -reconfigure
 
-      # 5) ワークスペース選択
+      # 5) tfvars を生成
+      - name: Render tfvars
+        working-directory: ${{ github.workspace }}/terraform${{ inputs.subdir }}
+        run: |
+          WS=${{ inputs.workspace }}
+          mkdir -p envs/${WS}
+          envsubst < envs/${WS}/terraform.tfvars.tmpl \
+            > envs/${WS}/terraform.tfvars
+        env:
+          TF_ENABLE_FEATURE_STORE: ${{ secrets.TF_ENABLE_FEATURE_STORE || 'false' }}
+
+      # 6) ワークスペース選択
       - name: Select workspace
         working-directory: terraform/bootstrap
         run: terraform workspace select ${{ inputs.workspace }} || terraform workspace new ${{ inputs.workspace }}
 
-      # 6) Terraform Quality (validate / fmt / TFLint / Trivy)
+      # 7) Terraform Quality (validate / fmt / TFLint / Trivy)
       - name: Terraform Quality
         uses: ./.github/actions/terraform-quality
         with:
           workdir: terraform/bootstrap
 
-      # 7-A) PLAN
+      # 8-A) PLAN
       - name: Terraform Plan
         if: inputs.command == 'plan'
         working-directory: terraform/bootstrap
@@ -79,7 +94,7 @@ jobs:
             echo "Terraform plan failed"; exit 1
           fi
 
-      # 7-B) APPLY
+      # 8-B) APPLY
       - name: Terraform Apply
         if: inputs.command == 'apply'
         working-directory: terraform/bootstrap
@@ -91,7 +106,7 @@ jobs:
             -auto-approve \
             -lock-timeout=300s
 
-      # 8) PR へ Plan コメント
+      # 9) PR へ Plan コメント
       - name: Comment plan to PR
         if: ${{ github.event_name == 'pull_request' && inputs.command == 'plan' }}
         uses: borchero/terraform-plan-comment@v2
