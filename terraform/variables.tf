@@ -44,7 +44,16 @@ variable "workbench_zone" {
   type        = string
 }
 
-# ---------- Feature Store 関連の変数 ----------
+variable "fetcher_image_uri" {
+  type        = string
+  description = "Fetcher 用コンテナイメージ (digest 推奨)"
+}
+
+variable "feature_import_image_uri" {
+  type        = string
+  description = "Feature-import Job 用コンテナイメージ"
+}
+
 variable "enable_feature_store" {
   type        = bool
   description = "Feature Store を有効にするかどうか"
