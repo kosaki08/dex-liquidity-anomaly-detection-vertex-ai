@@ -31,5 +31,5 @@ resource "google_vertex_ai_featurestore_entitytype_feature" "features" {
   labels     = var.common_labels
   value_type = each.value.value_type
 
-  description = each.value.description
+  description = lookup(each.value, "description", null) # 存在しない場合は null
 }
