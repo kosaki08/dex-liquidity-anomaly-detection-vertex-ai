@@ -1,6 +1,16 @@
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 locals {
   # GCP プロジェクト ID
   project_id = var.project_id
+
+  # GCP プロジェクト番号（変数が未指定なら自動取得値を採用）
+  project_number = coalesce(
+    var.project_number,
+    data.google_project.this.number
+  )
 
   # デプロイ先リージョン
   region = var.region

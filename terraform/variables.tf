@@ -3,6 +3,12 @@ variable "project_id" {
   description = "GCP プロジェクト ID"
 }
 
+variable "project_number" {
+  type        = string
+  description = "GCP プロジェクト番号"
+  default     = null
+}
+
 variable "region" {
   type        = string
   description = "リソースを作成するリージョン"
