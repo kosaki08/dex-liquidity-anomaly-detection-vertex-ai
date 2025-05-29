@@ -143,5 +143,6 @@ jobs:
 
           # 変数ファイルを使用してapply
           terraform apply -auto-approve -input=false \
+            -var "project_id=${{ secrets.PROJECT_ID }}" \
             -var-file=envs/dev/terraform.tfvars \
             -lock-timeout=300s
