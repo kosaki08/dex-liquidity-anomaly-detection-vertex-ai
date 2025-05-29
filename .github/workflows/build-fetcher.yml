@@ -33,59 +33,105 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) GCP 認証：Auth
+      # 2) jqをインストール
+      - name: Install jq
+        run: sudo apt-get update -y && sudo apt-get install -y jq
+
+      # 3) GCP 認証：Auth
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
           service_account: tf-apply-dev@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
 
-      # 3) gcloud CLI をセットアップ
+      # 4) gcloud CLI をセットアップ
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ secrets.PROJECT_ID }}
 
-      # 4) Docker 認証設定
+      # 5) Docker 認証設定
       - name: Configure Docker
         run: |
           gcloud auth configure-docker ${REGION}-docker.pkg.dev
 
-      # 5) Buildx セットアップ
+      # 6) Buildx セットアップ
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          install: true # imagetoolsコマンドが確実に使えるように
 
-      # 6) Fetcher イメージをビルド & プッシュ
-      - name: Build & push fetcher image (linux/amd64)
+      # 7) Fetcher イメージをビルド & プッシュ
+      - name: Build & push fetcher image
         id: build_fetcher
         run: |
+          set -euo pipefail
           IMG="$REGION-docker.pkg.dev/$PROJECT_ID/ml/fetcher:${{ github.sha }}"
+          METAFILE=$(mktemp -t buildmeta.XXXXXX)
+
           docker buildx build --platform linux/amd64 \
             -t "$IMG" \
+            -t "$REGION-docker.pkg.dev/$PROJECT_ID/ml/fetcher:latest" \
             -f docker/fetcher/Dockerfile . \
-            --push
-          DIGEST=$(docker buildx imagetools inspect "$IMG" --format '{{ .Digest }}')
-          echo "uri=$REGION-docker.pkg.dev/$PROJECT_ID/ml/fetcher@$DIGEST" >> $GITHUB_OUTPUT
+            --push \
+            --metadata-file "$METAFILE"
 
-      # 7) Feature Import イメージをビルド & プッシュ
-      - name: Build & push feature-import (amd64)
+          # メタデータからダイジェストを取得
+          if [ -f "$METAFILE" ]; then
+            DIGEST=$(jq -r '."containerimage.digest"' "$METAFILE")
+            
+            # ダイジェストの形式を検証
+            if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Error: Invalid digest format: $DIGEST"
+              exit 1
+            fi
+            
+            echo "Image digest: $DIGEST"
+            echo "uri=$REGION-docker.pkg.dev/$PROJECT_ID/ml/fetcher@$DIGEST" >> "$GITHUB_OUTPUT"
+            rm -f "$METAFILE"
+          else
+            echo "Error: Metadata file not found"
+            exit 1
+          fi
+
+      # 8) Feature Import イメージをビルド & プッシュ
+      - name: Build & push feature-import
         id: build_import
         run: |
+          set -euo pipefail
           IMG="$REGION-docker.pkg.dev/$PROJECT_ID/ml/feature-import:${{ github.sha }}"
+          METAFILE=$(mktemp -t buildmeta.XXXXXX) # BuildKit が書き出すメタデータ用の一時ファイル
+
           docker buildx build --platform linux/amd64 \
             -t "$IMG" \
+            -t "$REGION-docker.pkg.dev/$PROJECT_ID/ml/feature-import:latest" \
             -f jobs/feature_import/Dockerfile jobs/feature_import \
-            --push
-          DIGEST=$(docker buildx imagetools inspect "$IMG" --format '{{ .Digest }}')
-          echo "uri=$REGION-docker.pkg.dev/$PROJECT_ID/ml/feature-import@$DIGEST" >> $GITHUB_OUTPUT
+            --push \
+            --metadata-file "$METAFILE"
 
-      # 8) Terraform をセットアップ
+          if [ -f "$METAFILE" ]; then
+            DIGEST=$(jq -r '."containerimage.digest"' "$METAFILE")
+            
+            if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Error: Invalid digest format: $DIGEST"
+              exit 1
+            fi
+            
+            echo "Image digest: $DIGEST"
+            echo "uri=$REGION-docker.pkg.dev/$PROJECT_ID/ml/feature-import@$DIGEST" >> "$GITHUB_OUTPUT"
+            rm -f "$METAFILE"
+          else
+            echo "Error: Metadata file not found"
+            exit 1
+          fi
+
+      # 9) Terraform をセットアップ
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3.1.2
         with:
           terraform_version: 1.8.0
 
-      # 9) Terraform の適用
+      # 10) Terraform の適用
       - name: Terraform apply (dev)
         working-directory: terraform
         env:
@@ -94,4 +140,8 @@ jobs:
         run: |
           terraform init -backend-config=envs/dev/backend.conf -upgrade -input=false
           terraform workspace select dev || terraform workspace new dev
-          terraform apply -auto-approve -lock-timeout=300s
+
+          # 変数ファイルを使用してapply
+          terraform apply -auto-approve -input=false \
+            -var-file=envs/dev/terraform.tfvars \
+            -lock-timeout=300s
