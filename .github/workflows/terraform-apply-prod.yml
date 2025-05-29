@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     concurrency:
-      group: terraform-prod-apply
+      group: terraform-prod
       cancel-in-progress: false # デプロイ中はキャンセルしない
     env:
       TF_WORKSPACE: prod

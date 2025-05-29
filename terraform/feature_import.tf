@@ -8,7 +8,7 @@ module "feature_import_job" {
   name       = "fs-import-${local.env_suffix}"
   region     = local.region
 
-  image_uri       = "${local.region}-docker.pkg.dev/${local.project_id}/ml/feature-import:latest"
+  image_uri       = var.feature_import_image_uri
   service_account = module.service_accounts.emails["vertex-pipeline"]
   vpc_connector   = module.network.connector_id
   env_vars = {
