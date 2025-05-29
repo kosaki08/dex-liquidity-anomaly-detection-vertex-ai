@@ -22,6 +22,10 @@ env:
 
 jobs:
   build:
+    concurrency:
+      group: terraform-dev # 同時実行防止
+      cancel-in-progress: true # 古いプランのみキャンセル
+
     runs-on: ubuntu-latest
 
     steps:
