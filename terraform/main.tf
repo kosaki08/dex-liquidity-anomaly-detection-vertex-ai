@@ -188,7 +188,7 @@ module "fetcher_job_uniswap" {
   project_id            = local.project_id
   name                  = "dex-fetch-uni-${local.env_suffix}"
   region                = local.region
-  image_uri             = "${local.region}-docker.pkg.dev/${local.project_id}/ml/fetcher:latest"
+  image_uri             = var.fetcher_image_uri
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
   vpc_connector         = module.network.connector_id
@@ -222,7 +222,7 @@ module "fetcher_job_sushiswap" {
   project_id            = local.project_id
   name                  = "dex-fetch-sushi-${local.env_suffix}"
   region                = local.region
-  image_uri             = "${local.region}-docker.pkg.dev/${local.project_id}/ml/fetcher:latest"
+  image_uri             = var.fetcher_image_uri
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
   vpc_connector         = module.network.connector_id

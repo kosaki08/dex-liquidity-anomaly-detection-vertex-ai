@@ -1,24 +1,32 @@
-name: Build Fetcher Image
+name: Build & Deploy (dev)
 
 # パーミッション設定
 permissions:
   contents: read
   id-token: write
+  deployments: write
 
 on:
-  workflow_dispatch: # UI から手動トリガー可能
   push:
-    branches: [dev]
-    paths: ["jobs/fetcher/**"]
+    branches: [dev] # dev ブランチにマージしたら自動
+    paths:
+      - "docker/fetcher/**"
+      - "jobs/feature_import/**"
+      - "src/**"
+      - "terraform/**"
+  workflow_dispatch: # UI から手動トリガー可能
+
+env:
+  REGION: asia-northeast1
+  PROJECT_ID: ${{ secrets.PROJECT_ID }}
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-dev # 同時実行防止
+      cancel-in-progress: true # 古いプランのみキャンセル
 
-    env:
-      PROJECT_ID: ${{ secrets.PROJECT_ID }}
-      REGION: asia-northeast1
-      TAG: ${{ github.sha }}
+    runs-on: ubuntu-latest
 
     steps:
       # 1) リポジトリのチェックアウト
@@ -30,7 +38,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
-          service_account: tf-svc@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
+          service_account: tf-apply-dev@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
 
       # 3) gcloud CLI をセットアップ
       - name: Set up gcloud
@@ -38,16 +46,52 @@ jobs:
         with:
           project_id: ${{ secrets.PROJECT_ID }}
 
-      # 4) Buildx セットアップ
+      # 4) Docker 認証設定
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+      # 5) Buildx セットアップ
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 5) Fetcher イメージをビルド & プッシュ
+      # 6) Fetcher イメージをビルド & プッシュ
       - name: Build & push fetcher image (linux/amd64)
-        working-directory: jobs/fetcher
+        id: build_fetcher
         run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/ml/fetcher:${TAG} \
-            -f Dockerfile . \
+          IMG="$REGION-docker.pkg.dev/$PROJECT_ID/ml/fetcher:${{ github.sha }}"
+          docker buildx build --platform linux/amd64 \
+            -t "$IMG" \
+            -f docker/fetcher/Dockerfile . \
             --push
+          DIGEST=$(docker buildx imagetools inspect "$IMG" --format '{{ .Digest }}')
+          echo "uri=$REGION-docker.pkg.dev/$PROJECT_ID/ml/fetcher@$DIGEST" >> $GITHUB_OUTPUT
+
+      # 7) Feature Import イメージをビルド & プッシュ
+      - name: Build & push feature-import (amd64)
+        id: build_import
+        run: |
+          IMG="$REGION-docker.pkg.dev/$PROJECT_ID/ml/feature-import:${{ github.sha }}"
+          docker buildx build --platform linux/amd64 \
+            -t "$IMG" \
+            -f jobs/feature_import/Dockerfile jobs/feature_import \
+            --push
+          DIGEST=$(docker buildx imagetools inspect "$IMG" --format '{{ .Digest }}')
+          echo "uri=$REGION-docker.pkg.dev/$PROJECT_ID/ml/feature-import@$DIGEST" >> $GITHUB_OUTPUT
+
+      # 8) Terraform をセットアップ
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: 1.8.0
+
+      # 9) Terraform の適用
+      - name: Terraform apply (dev)
+        working-directory: terraform
+        env:
+          TF_VAR_fetcher_image_uri: ${{ steps.build_fetcher.outputs.uri }}
+          TF_VAR_feature_import_image_uri: ${{ steps.build_import.outputs.uri }}
+        run: |
+          terraform init -backend-config=envs/dev/backend.conf -upgrade -input=false
+          terraform workspace select dev || terraform workspace new dev
+          terraform apply -auto-approve -lock-timeout=300s

@@ -1,5 +1,18 @@
 locals {
+  # ステートバケット名
   state_bucket_name = var.state_bucket
+
+  # CI 用 SA
+  ci_sa = "serviceAccount:tf-apply-${var.env_suffix}@${var.project_id}.iam.gserviceaccount.com"
+
+  # 読み取り系ロール
+  viewer_roles = [
+    "roles/viewer",
+    "roles/run.viewer",
+    "roles/aiplatform.viewer",
+    "roles/secretmanager.viewer",
+    "roles/bigquery.metadataViewer",
+  ]
 }
 
 # ステートバケットの権限付与
@@ -9,11 +22,13 @@ resource "google_storage_bucket_iam_member" "tf_sa_state_bucket" {
   member = "serviceAccount:${google_service_account.tf_apply.email}"
 }
 
-# 読み取り系ロール
-resource "google_project_iam_member" "tf_sa_viewer" {
+# CI 用 SA に読み取り系ロールを付与
+resource "google_project_iam_member" "tf_sa_viewer_roles" {
+  for_each = toset(local.viewer_roles)
+
   project = var.project_id
-  role    = "roles/viewer"
-  member  = "serviceAccount:${google_service_account.tf_apply.email}"
+  role    = each.value
+  member  = local.ci_sa
 }
 
 # データバケットの bucket-level 権限
@@ -45,6 +60,7 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
     "roles/compute.securityAdmin",           # ファイアウォール更新用
     "roles/run.admin",                       # Cloud Run Job 管理
     "roles/cloudscheduler.admin",            # Cloud Scheduler 管理
+    "roles/artifactregistry.writer",         # Artifact Registry 書き込み用
   ])
   project = var.project_id
   role    = each.value
