@@ -32,13 +32,18 @@ resource "google_cloud_run_v2_job" "this" {
         }
 
         # Secret 参照 env
-        env {
-          name = "THE_GRAPH_API_KEY"
-
-          value_source {
-            secret_key_ref {
-              secret  = var.secret_name_graph_api
-              version = "latest"
+        dynamic "env" {
+          # シークレットがない場合は空オブジェクト
+          for_each = var.secret_name_graph_api == null ? {} : {
+            THE_GRAPH_API_KEY = var.secret_name_graph_api
+          }
+          content {
+            name = "THE_GRAPH_API_KEY"
+            value_source {
+              secret_key_ref {
+                secret  = env.value
+                version = "latest"
+              }
             }
           }
         }

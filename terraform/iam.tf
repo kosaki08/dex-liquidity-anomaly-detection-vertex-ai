@@ -55,6 +55,62 @@ resource "google_project_iam_member" "vertex_pipeline_bq" {
   member  = "serviceAccount:${local.sa["vertex-pipeline"]}"
 }
 
+# BigQuery データ閲覧権限
+resource "google_project_iam_member" "vertex_pipeline_bq_reader" {
+  project = local.project_id
+  role    = "roles/bigquery.dataViewer"
+  member  = "serviceAccount:${local.sa["vertex-pipeline"]}"
+}
+
+# Cloud Run Job 実行権限
+resource "google_project_iam_member" "vertex_pipeline_run_invoker" {
+  project = local.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${module.service_accounts.emails["vertex-pipeline"]}"
+}
+
+# Cloud Run Job の VPC アクセス権限
+resource "google_project_iam_member" "vertex_pipeline_networkuser" {
+  project = local.project_id
+  role    = "roles/vpcaccess.user"
+  member  = "serviceAccount:${module.service_accounts.emails["vertex-pipeline"]}"
+}
+
+# Cloud Run Job が pull するための Artifact Registry の読み取り権限
+resource "google_project_iam_member" "vertex_pipeline_ar_reader" {
+  project = local.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${module.service_accounts.emails["vertex-pipeline"]}"
+}
+
+# Artifact Registry → Pull 権限
+resource "google_project_iam_member" "vertex_ar_reader" {
+  project = local.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${local.sa["vertex"]}"
+}
+
+# VPC Access Connector 利用権限
+resource "google_project_iam_member" "vertex_vpcaccess_user" {
+  project = local.project_id
+  role    = "roles/vpcaccess.user"
+  member  = "serviceAccount:${local.sa["vertex"]}"
+}
+
+# BigQuery DTS 専用 SA に一括付与
+resource "google_bigquery_dataset_iam_member" "bq_dts_dataset_editor" {
+  dataset_id = module.bigquery.staging_dataset_id
+  project    = local.project_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:service-${local.project_number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+}
+
+# Cloud Scheduler から Cloud Run Job を実行するための権限
+resource "google_service_account_iam_member" "scheduler_impersonate_vertex_pipeline" {
+  service_account_id = "projects/${local.project_id}/serviceAccounts/${module.service_accounts.emails["vertex-pipeline"]}"
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${local.project_number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
+}
 
 # ---------- Feature Store 関連の権限 ----------
 # Feature Store ユーザー権限
