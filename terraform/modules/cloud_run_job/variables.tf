@@ -31,6 +31,7 @@ variable "env_vars" {
 variable "secret_name_graph_api" {
   type        = string
   description = "Graph API のシークレット名"
+  default     = null
 }
 
 variable "vpc_connector" {

@@ -35,7 +35,7 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
   for_each = toset([
     "roles/storage.admin",                   # GCS バケット管理
     "roles/iam.serviceAccountAdmin",         # サービスアカウント管理
-    "roles/resourcemanager.projectIamAdmin", # プロジェクトレベルIAM管理
+    "roles/resourcemanager.projectIamAdmin", # プロジェクトレベルIAM管理 TODO: 権限が強いため、個別ロールへ分解する
     "roles/serviceusage.serviceUsageAdmin",  # API有効化
     "roles/compute.networkAdmin",            # VPC管理
     "roles/notebooks.admin",                 # Workbench 作成用

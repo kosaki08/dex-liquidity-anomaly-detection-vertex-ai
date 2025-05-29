@@ -4,14 +4,16 @@ resource "google_project_service" "services" {
     "bigquery.googleapis.com",
     "aiplatform.googleapis.com",
     "artifactregistry.googleapis.com",
-    "storage.googleapis.com",        # BigQuery バケット用
-    "notebooks.googleapis.com",      # Vertex AI Notebook 用
-    "compute.googleapis.com",        # VPC ネットワーク用
-    "vpcaccess.googleapis.com",      # Serverless VPC Access Connector 用
-    "iamcredentials.googleapis.com", # サービスアカウント用
-    "secretmanager.googleapis.com",  # シークレットマネージャー用
-    "run.googleapis.com",            # Cloud Run Job 用
-    "cloudscheduler.googleapis.com", # Cloud Scheduler 用
+    "storage.googleapis.com",              # BigQuery バケット用
+    "notebooks.googleapis.com",            # Vertex AI Notebook 用
+    "compute.googleapis.com",              # VPC ネットワーク用
+    "vpcaccess.googleapis.com",            # Serverless VPC Access Connector 用
+    "iamcredentials.googleapis.com",       # サービスアカウント用
+    "secretmanager.googleapis.com",        # シークレットマネージャー用
+    "run.googleapis.com",                  # Cloud Run Job 用
+    "cloudscheduler.googleapis.com",       # Cloud Scheduler 用
+    "bigquerydatatransfer.googleapis.com", # ← BigQuery Scheduled Query 用
+    "dataflow.googleapis.com",             # ← Feature Store Import が内部で起動
   ])
   service = each.key
 }
@@ -138,6 +140,15 @@ module "feature_store" {
   ]
 }
 
+# BigQuery → GCS → Feature Store へのインポート定義
+module "bq_export_feature_import" {
+  source                 = "./modules/bq_export_feature_import"
+  project_id             = local.project_id
+  region                 = local.region
+  destination_dataset_id = module.bigquery.staging_dataset_id
+  dataset_id             = module.bigquery.features_dataset_id
+}
+
 # Notebook / Vertex AI Workbench
 module "workbench" {
   source            = "./modules/workbench"
@@ -201,7 +212,7 @@ module "fetcher_schedule_uniswap" {
   region         = local.region
   schedule       = "0 * * * *"
   job_name       = module.fetcher_job_uniswap.job_name
-  oauth_sa_email = module.service_accounts.emails["vertex"]
+  oauth_sa_email = module.service_accounts.emails["vertex-pipeline"]
   depends_on     = [module.fetcher_job_uniswap]
 }
 
@@ -235,7 +246,7 @@ module "fetcher_schedule_sushiswap" {
   region         = local.region
   schedule       = "0 * * * *"
   job_name       = module.fetcher_job_sushiswap.job_name
-  oauth_sa_email = module.service_accounts.emails["vertex"]
+  oauth_sa_email = module.service_accounts.emails["vertex-pipeline"]
   depends_on     = [module.fetcher_job_sushiswap]
 }
 
