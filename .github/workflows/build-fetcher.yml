@@ -1,0 +1,53 @@
+name: Build Fetcher Image
+
+# パーミッション設定
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  workflow_dispatch: # UI から手動トリガー可能
+  push:
+    branches: [dev]
+    paths: ["jobs/fetcher/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_ID: ${{ secrets.PROJECT_ID }}
+      REGION: asia-northeast1
+      TAG: ${{ github.sha }}
+
+    steps:
+      # 1) リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2) GCP 認証：Auth
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ secrets.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/gh-pool/providers/gh-provider
+          service_account: tf-svc@${{ secrets.PROJECT_ID }}.iam.gserviceaccount.com
+
+      # 3) gcloud CLI をセットアップ
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.PROJECT_ID }}
+
+      # 4) Buildx セットアップ
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 5) Fetcher イメージをビルド & プッシュ
+      - name: Build & push fetcher image (linux/amd64)
+        working-directory: jobs/fetcher
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/ml/fetcher:${TAG} \
+            -f Dockerfile . \
+            --push
