@@ -9,7 +9,7 @@ on:
   workflow_dispatch: # UI から手動トリガー可能
   push:
     branches: [dev]
-    paths: ["jobs/fetcher/**"]
+    paths: ["jobs/feature_import/**"]
 
 jobs:
   build:
@@ -38,13 +38,18 @@ jobs:
         with:
           project_id: ${{ secrets.PROJECT_ID }}
 
-      # 4) Buildx セットアップ
+      # 4) Docker 認証設定
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+      # 5) Buildx セットアップ
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 5) Fetcher イメージをビルド & プッシュ
+      # 6) Fetcher イメージをビルド & プッシュ
       - name: Build & push fetcher image (linux/amd64)
-        working-directory: jobs/fetcher
+        working-directory: jobs/ffeature_importetcher
         run: |
           docker buildx build \
             --platform linux/amd64 \
