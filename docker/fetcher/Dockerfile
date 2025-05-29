@@ -12,4 +12,4 @@ COPY src/ /app/src
 COPY protocols.yml /app/src/
 ENV PYTHONPATH=/app/src
 
-ENTRYPOINT ["python", "-m", "jobs.fetcher.run_fetch_cli"]
+ENTRYPOINT ["python", "-m", "src.jobs.fetcher.run_fetch_cli"]
