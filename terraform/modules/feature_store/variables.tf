@@ -39,7 +39,8 @@ variable "aiplatform_service_dependency" {
 variable "basic_features" {
   description = "基本的な特徴量定義（monitoring設定なし）"
   type = map(object({
-    value_type = string
+    value_type  = string
+    description = optional(string, "")
   }))
   default = {
     "volume_usd"    = { value_type = "DOUBLE" }
