@@ -9,7 +9,12 @@ RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt
 
 # アプリケーションコードをコピー
 COPY src/ /app/src
-COPY protocols.yml /app/src/
+
+# protocols.yml をプロジェクトルートからコピー（重要）
+COPY protocols.yml .
+
+# パスを設定
 ENV PYTHONPATH=/app/src
 
+# エントリーポイント
 ENTRYPOINT ["python", "-m", "src.jobs.fetcher.run_fetch_cli"]
