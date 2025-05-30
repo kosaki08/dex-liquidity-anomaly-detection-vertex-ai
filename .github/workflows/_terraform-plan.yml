@@ -120,13 +120,17 @@ jobs:
             -var-file=envs/${{ inputs.workspace }}/terraform.tfvars \
             -var "project_id=${{ secrets.PROJECT_ID }}" \
             -var "env_suffix=${{ inputs.workspace }}" \
-            -var "fetcher_image_uri=dummy" \
-            -var "feature_import_image_uri=dummy" \
             -lock-timeout=300s \
             -input=false \
             -no-color \
             -detailed-exitcode \
             -out=tfplan || TF_EXIT=$?
+
+          # エラーチェック
+          if [ "${TF_EXIT:-0}" -eq 1 ]; then
+            echo "::error::Terraform plan failed with exit code $TF_EXIT"
+            exit 1
+          fi
 
       # 13) PR へ Plan コメント
       - name: Comment plan to PR
