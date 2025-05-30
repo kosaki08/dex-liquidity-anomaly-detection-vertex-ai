@@ -12,11 +12,6 @@ from google.api_core import retry
 from google.cloud.aiplatform_v1 import FeaturestoreOnlineServingServiceClient
 from google.cloud.aiplatform_v1 import types as fs_types
 
-_PROJECT = os.getenv("PROJECT_ID")
-_REGION = os.getenv("REGION", "asia-northeast1")
-_FS_NAME = os.getenv("FEATURESTORE_NAME")
-_ENTITY_TYPE_ID = "dex_liquidity"
-
 logger = logging.getLogger(__name__)
 
 
@@ -47,29 +42,17 @@ class FeatureStoreConfig:
 
 
 @lru_cache(maxsize=1)
-def _get_client() -> FeaturestoreOnlineServingServiceClient:
-    """クライアントのシングルトンインスタンスを返す"""
-    client_options = {"api_endpoint": f"{os.getenv('REGION', 'asia-northeast1')}-aiplatform.googleapis.com"}
-    return FeaturestoreOnlineServingServiceClient(client_options=client_options)
-
-
-@lru_cache(maxsize=1)
 def _get_config() -> FeatureStoreConfig:
     """設定のシングルトンインスタンスを返す"""
     return FeatureStoreConfig()
 
 
-# entity_type_path を組み立て
-def _entity_type_path() -> str:
-    return FeaturestoreOnlineServingServiceClient.entity_type_path(
-        project=_PROJECT,
-        location=_REGION,
-        featurestore=_FS_NAME,
-        entity_type=_ENTITY_TYPE_ID,
-    )
-
-
-_client = FeaturestoreOnlineServingServiceClient()
+@lru_cache(maxsize=1)
+def _get_client() -> FeaturestoreOnlineServingServiceClient:
+    """クライアントのシングルトンインスタンスを返す"""
+    config = _get_config()
+    client_options = {"api_endpoint": f"{config.region}-aiplatform.googleapis.com"}
+    return FeaturestoreOnlineServingServiceClient(client_options=client_options)
 
 
 def read_features(pool_id: str, feature_ids: List[str], default_value: Optional[float] = None) -> Dict[str, float]:
@@ -98,23 +81,44 @@ def read_features(pool_id: str, feature_ids: List[str], default_value: Optional[
         multiplier=2.0,
     )
 
-    response = gapic_retry(client.read_feature_values)(request=request)
+    try:
+        response = client.read_feature_values(request=request, retry=gapic_retry)
 
-    features: dict[str, float] = {}
-    for fv in response.feature_values:
-        fid = fv.name.split("/")[-1]
-        val_oneof = fv.value.WhichOneof("value")
-        if val_oneof == "double_value":
-            features[fid] = fv.value.double_value
-        elif val_oneof == "int64_value":
-            features[fid] = float(fv.value.int64_value)
+        features: dict[str, float] = {}
+
+        # header フィールドでエンティティの状態を確認
+        if hasattr(response, "header"):
+            logger.debug(f"Response header: {response.header}")
+
+        # entity_view を使用
+        if hasattr(response, "entity_view"):
+            if hasattr(response.entity_view, "data"):
+                # dataは配列で、インデックスはheader.feature_descriptorsと対応
+                for i, feature_data in enumerate(response.entity_view.data):
+                    if i < len(response.header.feature_descriptors):
+                        feature_name = response.header.feature_descriptors[i].id
+
+                        # dataオブジェクトから値を取得
+                        if feature_data and hasattr(feature_data, "value") and feature_data.value is not None:
+                            value = feature_data.value
+                            if hasattr(value, "double_value"):
+                                features[feature_name] = value.double_value
+                            elif hasattr(value, "int64_value"):
+                                features[feature_name] = float(value.int64_value)
+                        else:
+                            # 値が存在しない場合（空のdataオブジェクト）
+                            logger.debug(f"No value for feature {feature_name}")
+
+    except Exception as e:
+        logger.error(f"Failed to read features for pool_id={masked}: {e}", exc_info=True)
+        features = {}
 
     # デフォルト値補完
     if default_value is not None:
         for fid in feature_ids:
             features.setdefault(fid, default_value)
 
-    if not features:
-        logger.warning(f"No features returned for pool_id={masked}")
+    if len(features) == 0 or all(v == default_value for v in features.values()):
+        logger.info(f"No features returned for pool_id={masked}, using default values")
 
     return features
