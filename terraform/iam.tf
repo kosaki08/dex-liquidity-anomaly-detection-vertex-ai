@@ -62,6 +62,20 @@ resource "google_project_iam_member" "vertex_pipeline_bq_reader" {
   member  = "serviceAccount:${local.sa["vertex-pipeline"]}"
 }
 
+# Cloud Run Job (Fetcher) の BigQuery 権限
+resource "google_project_iam_member" "vertex_bigquery_editor" {
+  project = local.project_id
+  role    = "roles/bigquery.dataEditor"
+  member  = "serviceAccount:${local.sa["vertex"]}"
+}
+
+# BigQuery ジョブ実行権限
+resource "google_project_iam_member" "vertex_bigquery_job_user" {
+  project = local.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${local.sa["vertex"]}"
+}
+
 # Cloud Run Job 実行権限
 resource "google_project_iam_member" "vertex_pipeline_run_invoker" {
   project = local.project_id
