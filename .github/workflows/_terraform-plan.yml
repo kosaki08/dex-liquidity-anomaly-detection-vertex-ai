@@ -126,6 +126,12 @@ jobs:
             -detailed-exitcode \
             -out=tfplan || TF_EXIT=$?
 
+          # エラーチェック
+          if [ "${TF_EXIT:-0}" -eq 1 ]; then
+            echo "::error::Terraform plan failed with exit code $TF_EXIT"
+            exit 1
+          fi
+
       # 13) PR へ Plan コメント
       - name: Comment plan to PR
         if: github.event_name == 'pull_request'
