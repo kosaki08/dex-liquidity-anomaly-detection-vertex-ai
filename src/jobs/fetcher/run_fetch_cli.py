@@ -6,7 +6,9 @@ import logging
 import os
 import tempfile
 from datetime import datetime, timezone
+from uuid import uuid4
 
+from google.api_core.exceptions import PreconditionFailed
 from google.cloud import bigquery, storage
 from google.cloud.bigquery import SchemaField
 
@@ -32,10 +34,17 @@ def main() -> None:
         local_file = f"{tmp}/{protocol}_{interval_iso}.jsonl"
         fetch_pool_data(protocol, local_file, interval_iso)
 
-        # GCSにアップロード
-        gcs_path = f"raw/{protocol}/{interval_iso[:10]}/{os.path.basename(local_file)}"
-        storage.Client(project=project_id).bucket(bucket).blob(gcs_path).upload_from_filename(local_file)
-        print(f"uploaded gs://{bucket}/{gcs_path}")
+        unique_id = uuid4().hex  # 32 桁
+        gcs_path = (
+            f"raw/{protocol}/{interval_iso[:10]}/{os.path.splitext(os.path.basename(local_file))[0]}_{unique_id}.jsonl"
+        )
+        blob = storage.Client(project=project_id).bucket(bucket).blob(gcs_path)
+        try:
+            blob.upload_from_filename(local_file, if_generation_match=0)
+            logger.info("uploaded gs://%s/%s", bucket, gcs_path)
+        except PreconditionFailed:
+            logger.info("%s already exists - skipped", gcs_path)
+            return
 
     # BigQuery RAW dataset にロード
     bq = bigquery.Client(project=project_id)
@@ -46,7 +55,13 @@ def main() -> None:
     # 自動検出ではなく raw(JSON) 1 カラムに固定してロード
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        schema=[SchemaField("raw", "JSON")],  # 固定スキーマ
+        schema=[
+            SchemaField("raw", "JSON", mode="REQUIRED"),
+            SchemaField("pool_id", "STRING", mode="REQUIRED"),
+            SchemaField("dex_protocol", "STRING", mode="REQUIRED"),
+            SchemaField("hour_ts", "TIMESTAMP", mode="REQUIRED"),
+            SchemaField("load_ts", "TIMESTAMP", mode="REQUIRED"),  # defaultValueExpression が補完
+        ],
         write_disposition="WRITE_APPEND",
         ignore_unknown_values=True,  # 将来の余分カラム無視
     )

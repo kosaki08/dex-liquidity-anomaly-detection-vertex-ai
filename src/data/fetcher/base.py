@@ -78,7 +78,14 @@ class BaseFetcher:
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("w", encoding="utf-8") as f:
             for rec in records:
-                f.write(json.dumps({"raw": rec}, ensure_ascii=False) + "\n")
+                row = {
+                    "raw": rec,
+                    "pool_id": rec["pool"]["id"],
+                    "dex_protocol": f"{self.name}_v3",
+                    "hour_ts": datetime.utcfromtimestamp(rec["periodStartUnix"]).isoformat(timespec="seconds") + "Z",
+                    "load_ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                }
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
         logging.info(f"[{self.name}] saved {len(records)} to {output_path}")
 
     def run(self, output_path: str, interval_end_iso: str) -> None:
