@@ -14,7 +14,7 @@ def load_protocol_config() -> ProtocolConfigMap:
     # 環境変数 or YAMLで定義したprotocols.ymlを読み込み
     # config.py は scripts/fetcher/config.py にあるので、
     # 親(parent)[0]=fetcher, 親(parent)[1]=scripts, 親(parent)[2]=project root
-    cfg_path = Path(__file__).resolve().parents[2] / "protocols.yml"
+    cfg_path = Path(__file__).resolve().parents[3] / "protocols.yml"
     if not cfg_path.exists():
         raise FileNotFoundError(f"{cfg_path} が見つかりません")
 
