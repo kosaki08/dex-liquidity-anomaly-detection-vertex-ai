@@ -47,11 +47,21 @@ variable "workbench_zone" {
 variable "fetcher_image_uri" {
   type        = string
   description = "Fetcher 用コンテナイメージ (digest 推奨)"
+
+  validation {
+    condition     = var.fetcher_image_uri != "dummy"
+    error_message = "fetcher_image_uri cannot be 'dummy'. Please provide a valid container image URI."
+  }
 }
 
 variable "feature_import_image_uri" {
   type        = string
   description = "Feature-import Job 用コンテナイメージ"
+
+  validation {
+    condition     = can(regex("^asia-northeast1-docker\\.pkg\\.dev/.+/(feature-import:latest|feature-import@sha256:[0-9a-f]{64})$", var.feature_import_image_uri))
+    error_message = "feature_import_image_uri must be a valid Artifact Registry URI with either :latest tag or @sha256 digest"
+  }
 }
 
 variable "enable_feature_store" {
