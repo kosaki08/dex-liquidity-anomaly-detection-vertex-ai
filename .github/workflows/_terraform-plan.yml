@@ -120,8 +120,6 @@ jobs:
             -var-file=envs/${{ inputs.workspace }}/terraform.tfvars \
             -var "project_id=${{ secrets.PROJECT_ID }}" \
             -var "env_suffix=${{ inputs.workspace }}" \
-            -var "fetcher_image_uri=dummy" \
-            -var "feature_import_image_uri=dummy" \
             -lock-timeout=300s \
             -input=false \
             -no-color \
