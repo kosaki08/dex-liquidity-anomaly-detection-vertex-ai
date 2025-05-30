@@ -66,6 +66,6 @@ resource "google_storage_bucket_iam_member" "aiplatform_sa_bucket_reader" {
 # Vertex AI が読み書きするバケット権限
 resource "google_storage_bucket_iam_member" "vertex_raw_bucket_writer" {
   bucket = google_storage_bucket.data_bucket.name
-  role   = "roles/storage.objectCreator"
+  role   = "roles/storage.objectAdmin" # delete を含む
   member = "serviceAccount:${module.service_accounts.emails["vertex"]}"
 }
