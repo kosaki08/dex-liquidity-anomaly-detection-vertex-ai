@@ -7,6 +7,7 @@ module "feature_import_job" {
   project_id = local.project_id
   name       = "fs-import-${local.env_suffix}"
   region     = local.region
+  env_suffix = local.env_suffix
 
   image_uri       = var.feature_import_image_uri
   service_account = module.service_accounts.emails["vertex-pipeline"]

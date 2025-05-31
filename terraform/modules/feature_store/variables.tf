@@ -36,6 +36,12 @@ variable "aiplatform_service_dependency" {
   default     = null
 }
 
+variable "kms_key_name" {
+  description = "Feature Store暗号化用のCloud KMSキー名（prodのみ必須）"
+  type        = string
+  default     = null
+}
+
 variable "basic_features" {
   description = "基本的な特徴量定義（monitoring設定なし）"
   type = map(object({

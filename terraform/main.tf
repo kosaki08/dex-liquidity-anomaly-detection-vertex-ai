@@ -127,6 +127,7 @@ module "feature_store" {
   project_name = "dex-anomaly-detection"
   region       = local.region
   env_suffix   = local.env_suffix
+  kms_key_name = var.kms_key_name
 
   common_labels = local.common_labels
 
@@ -188,6 +189,7 @@ module "fetcher_job_uniswap" {
   project_id            = local.project_id
   name                  = "dex-fetch-uni-${local.env_suffix}"
   region                = local.region
+  env_suffix            = local.env_suffix
   image_uri             = var.fetcher_image_uri
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
@@ -222,6 +224,7 @@ module "fetcher_job_sushiswap" {
   project_id            = local.project_id
   name                  = "dex-fetch-sushi-${local.env_suffix}"
   region                = local.region
+  env_suffix            = local.env_suffix
   image_uri             = var.fetcher_image_uri
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
@@ -257,4 +260,31 @@ module "workloads" {
   env_suffix = local.env_suffix
 
   depends_on = [google_project_service.services]
+}
+
+# 予測API
+module "prediction_service" {
+  source = "./modules/cloud_run_service"
+
+  name                  = "dex-prediction-${local.env_suffix}"
+  region                = local.region
+  env_suffix            = local.env_suffix
+  image_uri             = var.prediction_image_uri
+  service_account       = module.service_accounts.emails["vertex"]
+  vpc_connector         = module.network.connector_id
+  allow_unauthenticated = false
+  min_instances         = var.env_suffix == "prod" ? 1 : 0
+  max_instances         = 10
+
+  depends_on = [
+    google_project_service.services["run.googleapis.com"]
+  ]
+}
+
+# Cloud Run (prediction) を Vertex Pipeline から呼べるように
+resource "google_cloud_run_service_iam_member" "prediction_invoker" {
+  service  = module.prediction_service.service_name
+  location = local.region
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${module.service_accounts.emails["vertex-pipeline"]}"
 }
