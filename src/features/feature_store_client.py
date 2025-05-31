@@ -122,3 +122,51 @@ def read_features(pool_id: str, feature_ids: List[str], default_value: Optional[
         logger.info(f"No features returned for pool_id={masked}, using default values")
 
     return features
+
+
+def _parse_entity_view(entity_view, header) -> dict[str, float]:
+    """ReadFeatureValuesResponse の entity_view を dict に変換"""
+    result: dict[str, float] = {}
+
+    for idx, desc in enumerate(header.feature_descriptors):
+        fname = desc.id
+        if idx < len(entity_view.data):
+            val = entity_view.data[idx].value
+            if val is not None:
+                if hasattr(val, "double_value"):
+                    result[fname] = val.double_value
+                elif hasattr(val, "int64_value"):
+                    result[fname] = float(val.int64_value)
+    return result
+
+
+def read_features_batch(
+    pool_ids: list[str],
+    feature_ids: list[str],
+    batch_size: int = 100,
+) -> dict[str, dict[str, float]]:
+    """gRPC streamingを使用したバッチ読み取り"""
+    config = _get_config()
+    client = _get_client()
+    results: dict[str, dict[str, float]] = {}
+
+    for i in range(0, len(pool_ids), batch_size):
+        batch_pool_ids = pool_ids[i : i + batch_size]
+
+        try:
+            stream = client.streaming_read_feature_values(
+                entity_type=config.entity_type_path,
+                entity_ids=batch_pool_ids,
+                feature_selector=fs_types.FeatureSelector(id_matcher=fs_types.IdMatcher(ids=feature_ids)),
+            )
+
+            for resp in stream:
+                results[resp.entity_id] = _parse_entity_view(resp.entity_view, resp.header)
+
+        except Exception as e:
+            logger.error("streaming_read_feature_values failed: %s", e)
+            # フォールバックで個別読み取り
+            for pid in batch_pool_ids:
+                results[pid] = read_features(pid, feature_ids)
+
+    return results

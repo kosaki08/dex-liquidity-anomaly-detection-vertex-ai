@@ -31,6 +31,11 @@ resource "google_cloud_run_v2_job" "this" {
           value = var.project_id
         }
 
+        env {
+          name  = "ENV_SUFFIX"
+          value = var.env_suffix
+        }
+
         # Secret 参照 env
         dynamic "env" {
           # シークレットがない場合は空オブジェクト
@@ -50,7 +55,7 @@ resource "google_cloud_run_v2_job" "this" {
       }
       vpc_access { connector = var.vpc_connector }
       max_retries           = 3
-      timeout               = "600s"
+      timeout               = var.env_suffix == "prod" ? "900s" : "600s" # 環境によってタイムアウトを調整
       execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
     }
   }

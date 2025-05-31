@@ -70,8 +70,13 @@ variable "enable_feature_store" {
   default     = false
 }
 
-# variable "feature_store_node_count" {
-#   type        = number
-#   description = "Feature Store のオンライン配信ノード数"
-#   default     = 1
-# }
+variable "prediction_image_uri" {
+  type        = string
+  description = "予測API用コンテナイメージ"
+  default     = null # 実際のイメージURIを設定
+
+  validation {
+    condition     = var.prediction_image_uri == null || can(regex("^(gcr\\.io|.*-docker\\.pkg\\.dev)/.+", var.prediction_image_uri))
+    error_message = "prediction_image_uri must be a valid container registry URI"
+  }
+}

@@ -3,6 +3,12 @@ variable "project_id" {
   description = "GCP プロジェクト ID"
 }
 
+variable "env_suffix" {
+  description = "環境識別子（dev/prod）"
+  type        = string
+  default     = "dev"
+}
+
 variable "name" {
   type        = string
   description = "Cloud Run Job の名前"
