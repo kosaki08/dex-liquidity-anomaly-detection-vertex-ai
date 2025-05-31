@@ -5,7 +5,8 @@
     "context": ".."
   },
   "containerEnv": {
-    "REGION": "asia-northeast1"
+    "REGION": "asia-northeast1",
+    "PYTHONPATH": "/workspaces/${localWorkspaceFolderBasename}"
   },
   "mounts": [
     "source=${localEnv:HOME}/.config/gcloud,target=/home/vscode/.config/gcloud,type=bind"
