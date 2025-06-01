@@ -1,8 +1,11 @@
 # Feature Store インポートジョブ
 module "feature_import_job" {
-  source     = "./modules/cloud_run_job"
-  count      = var.enable_feature_store ? 1 : 0
-  depends_on = [module.feature_store]
+  source = "./modules/cloud_run_job"
+  count  = var.enable_feature_store ? 1 : 0
+  depends_on = [
+    module.feature_store,           # Feature Store 完成後に実行
+    module.bq_export_feature_import # エクスポート先ビュー作成後
+  ]
 
   project_id = local.project_id
   name       = "fs-import-${local.env_suffix}"
@@ -13,7 +16,7 @@ module "feature_import_job" {
   service_account = module.service_accounts.emails["vertex-pipeline"]
   vpc_connector   = module.network.connector_id
   env_vars = {
-    FEATURESTORE_ID = module.feature_store[0].featurestore_id
+    FEATURESTORE_ID = var.enable_feature_store ? module.feature_store[0].featurestore_id : ""
     GCS_PATH        = "gs://${local.project_id}-feature-import/hourly/*"
     REGION          = local.region
   }

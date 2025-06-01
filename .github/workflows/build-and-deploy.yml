@@ -19,11 +19,13 @@ on:
 env:
   REGION: asia-northeast1
   PROJECT_ID: ${{ secrets.PROJECT_ID }}
+  ENABLE_PREDICTION_GATEWAY: ${{ vars.ENABLE_PREDICTION_GATEWAY || 'false' }}
+  ENV: ${{ github.event.inputs.workspace || 'dev' }}
 
 jobs:
   build:
     concurrency:
-      group: terraform-dev # 同時実行防止
+      group: build-dev-${{ github.ref_name }} # 同時実行防止
       cancel-in-progress: true # 古いプランのみキャンセル
 
     runs-on: ubuntu-latest
@@ -94,7 +96,7 @@ jobs:
             exit 1
           fi
 
-      # 8) Feature Import イメージをビルド & プッシュ
+      # 9) Feature Import イメージをビルド & プッシュ
       - name: Build & push feature-import
         id: build_import
         run: |
@@ -125,13 +127,13 @@ jobs:
             exit 1
           fi
 
-      # 9) Terraform をセットアップ
+      # 10) Terraform をセットアップ
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3.1.2
         with:
           terraform_version: 1.8.0
 
-      # 10) Terraform の適用
+      # 11) Terraform の適用
       - name: Terraform apply (dev)
         working-directory: terraform
         env:
@@ -146,3 +148,93 @@ jobs:
             -var "project_id=${{ secrets.PROJECT_ID }}" \
             -var-file=envs/dev/terraform.tfvars \
             -lock-timeout=300s
+
+          # outputsを環境変数に保存
+          echo "ENDPOINT_ID=$(terraform output -raw vertex_endpoint_id)" >> "$GITHUB_ENV"
+
+      # 12) Model を Vertex AI にデプロイ
+      - name: Upload & Deploy model to Vertex AI
+        id: deploy_vertex
+        run: |
+          set -euo pipefail
+
+          MODEL_BUCKET="${PROJECT_ID}-data-${ENV_SUFFIX}"
+          gsutil cp models/iforest/* gs://${MODEL_BUCKET}/models/iforest/
+
+          MODEL_ID=$(gcloud ai models upload \
+            --region="${REGION}" \
+            --display-name="iforest-${ENV_SUFFIX}-$(date +%Y%m%d%H%M%S)" \
+            --artifact-uri="gs://$MODEL_BUCKET/models/iforest/" \
+            --container-image-uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-4:latest" \
+            --format="value(name)")
+
+          ENDPOINT_ID=$(gcloud ai endpoints list \
+            --region="${REGION}" \
+            --filter="displayName=dex-prediction-endpoint-${ENV_SUFFIX}" \
+            --format="value(name)" || true)
+
+          # エンドポイントが無ければ作る（初回のみ）
+          if [ -z "$ENDPOINT_ID" ]; then
+            ENDPOINT_ID=$(terraform output -raw vertex_endpoint_id)
+          fi
+
+          gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
+            --model="${MODEL_ID}" \
+            --region="${REGION}" \
+            --traffic-split=0=100 \
+            --machine-type=n1-standard-2
+
+          # GitHub 環境変数へ展開
+          echo "ENDPOINT_ID=${ENDPOINT_ID##*/}" >> "$GITHUB_ENV"
+
+      # 13) トラフィックを切り替えて古いモデルを削除
+      - name: Swap traffic & abandon old model
+        if: steps.deploy_vertex.outcome == 'success'
+        run: |
+          set -euo pipefail
+          REGION="${{ env.REGION }}"
+          ENDPOINT="${ENDPOINT_ID}"
+          # 直近 2 モデル取得
+          MODELS=$(gcloud ai endpoints describe "${ENDPOINT}" --region "${REGION}" \
+                    --format="value(deployedModels[].id)")
+          NEW_MODEL=$(echo "${MODELS}" | cut -d',' -f1)
+          OLD_MODEL=$(echo "${MODELS}" | cut -d',' -f2 || true)
+
+          # 旧モデルがあれば split を切り替えて 0%→delete
+          if [ -n "${OLD_MODEL}" ]; then
+            gcloud ai endpoints update "${ENDPOINT}" \
+              --region "${REGION}" \
+              --traffic-split="${OLD_MODEL}=0,${NEW_MODEL}=100"
+            gcloud ai endpoints undeploy-model "${ENDPOINT}" \
+              --deployed-model-id="${OLD_MODEL}" \
+              --region "${REGION}" --quiet
+          fi
+
+      # 14) Cloud Functions のデプロイ
+      - name: Deploy Prediction Gateway Function
+        if: env.ENABLE_PREDICTION_GATEWAY == 'true'
+        env:
+          ENV_SUFFIX: ${{ env.ENV }}
+          REGION: ${{ env.REGION }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          # 変数の定義
+          FUNC="dex-prediction-gateway-${ENV_SUFFIX}"
+
+          # ALLOWED_ORIGINS を prefix 追加
+          ALLOWED_ORIGINS="https://lookerstudio.google.com"
+          [ "$ENV_SUFFIX" = "dev" ] && ALLOWED_ORIGINS+=",http://localhost:3000"
+
+          # デプロイ
+          gcloud functions deploy "$FUNC" \
+            --gen2 \
+            --runtime python311 \
+            --region "${REGION}" \
+            --source functions/prediction_gateway \
+            --entry-point predict \
+            --trigger-http \
+            --allow-unauthenticated \
+            --min-instances=$([ "$ENV_SUFFIX" = "prod" ] && echo 1 || echo 0) \
+            --set-env-vars="^|^PROJECT_ID=${PROJECT_ID}|ENDPOINT_ID=${ENDPOINT_ID}|REGION=${REGION}|ALLOWED_ORIGINS=${ALLOWED_ORIGINS}"

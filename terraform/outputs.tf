@@ -4,13 +4,13 @@ output "bigquery_dataset_id" {
 }
 
 output "vertex_ai_endpoint_id" {
-  description = "作成された Vertex AI エンドポイントの ID"
-  value       = google_vertex_ai_endpoint.endpoint.id
+  description = "Vertex AI Endpoint のリソース ID"
+  value       = google_vertex_ai_endpoint.prediction.id
 }
 
 output "vertex_ai_endpoint_name" {
-  description = "作成された Vertex AI エンドポイントのリソース名"
-  value       = google_vertex_ai_endpoint.endpoint.name
+  description = "Vertex AI Endpoint の名前"
+  value       = google_vertex_ai_endpoint.prediction.name
 }
 
 output "data_bucket_name" {
@@ -21,15 +21,15 @@ output "data_bucket_name" {
 # ---------- Feature Store 関連の output ----------
 output "featurestore_id" {
   description = "作成された Feature Store の ID"
-  value       = var.enable_feature_store ? module.feature_store[0].featurestore_id : null
+  value       = try(module.feature_store[0].featurestore_id, null)
 }
 
 output "featurestore_name" {
   description = "作成された Feature Store の名前"
-  value       = var.enable_feature_store ? module.feature_store[0].featurestore_name : null
+  value       = try(module.feature_store[0].featurestore_name, null)
 }
 
 output "entitytype_id" {
   description = "作成された Entity Type の ID"
-  value       = var.enable_feature_store ? module.feature_store[0].entitytype_id : null
+  value       = try(module.feature_store[0].entitytype_id, null)
 }

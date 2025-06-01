@@ -70,13 +70,14 @@ variable "enable_feature_store" {
   default     = false
 }
 
-variable "prediction_image_uri" {
-  type        = string
-  description = "予測API用コンテナイメージ"
-  default     = null # 実際のイメージURIを設定
+variable "enable_looker_integration" {
+  type        = bool
+  description = "Looker Studio統合を有効にするか"
+  default     = true
+}
 
-  validation {
-    condition     = var.prediction_image_uri == null || can(regex("^(gcr\\.io|.*-docker\\.pkg\\.dev)/.+", var.prediction_image_uri))
-    error_message = "prediction_image_uri must be a valid container registry URI"
-  }
+variable "enable_prediction_gateway" {
+  type        = bool
+  description = "Cloud Functions予測ゲートウェイを有効にするか"
+  default     = false
 }

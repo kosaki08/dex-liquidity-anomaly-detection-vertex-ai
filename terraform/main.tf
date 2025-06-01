@@ -105,20 +105,6 @@ module "bigquery" {
   kms_key_name   = var.kms_key_name
 }
 
-# Vertex AI エンドポイント
-resource "google_vertex_ai_endpoint" "endpoint" {
-  name         = "${local.model_name}-endpoint-${local.env_suffix}"
-  display_name = "${local.model_name}-endpoint-${local.env_suffix}"
-  location     = local.region
-  labels = {
-    env = local.env_suffix
-  }
-
-  depends_on = [
-    google_project_service.services["aiplatform.googleapis.com"],
-  ]
-}
-
 # Feature Store
 module "feature_store" {
   source       = "./modules/feature_store"
@@ -262,29 +248,69 @@ module "workloads" {
   depends_on = [google_project_service.services]
 }
 
-# 予測API
-module "prediction_service" {
-  source = "./modules/cloud_run_service"
+# Vertex AI Model のデプロイ
+resource "google_vertex_ai_endpoint" "prediction" {
+  provider     = google-beta
+  name         = "dex-prediction-endpoint-${local.env_suffix}"
+  display_name = "DEX Anomaly Detection Endpoint"
+  location     = local.region
 
-  name                  = "dex-prediction-${local.env_suffix}"
-  region                = local.region
-  env_suffix            = local.env_suffix
-  image_uri             = var.prediction_image_uri
-  service_account       = module.service_accounts.emails["vertex"]
-  vpc_connector         = module.network.connector_id
-  allow_unauthenticated = false
-  min_instances         = var.env_suffix == "prod" ? 1 : 0
-  max_instances         = 10
+  labels = local.common_labels
+}
+
+# API Gateway 用の Cloud Functions
+module "prediction_gateway" {
+  source = "./modules/cloud_functions"
+  count  = var.enable_prediction_gateway ? 1 : 0
+
+  name       = "prediction-gateway-${local.env_suffix}"
+  region     = local.region
+  project_id = local.project_id
+
+  # ソースコード格納用バケット（既存のデータバケットを使用）
+  source_bucket = google_storage_bucket.data_bucket.name
+
+  # ソースディレクトリのパス
+  source_dir = "${path.module}/../functions/prediction_gateway"
+
+  # 外部に公開するため認証なし
+  allow_unauthenticated = true
+
+  environment_variables = {
+    PROJECT_ID  = local.project_id
+    ENDPOINT_ID = split("/", google_vertex_ai_endpoint.prediction.id)[4]
+    REGION      = local.region
+  }
+
+  # 本番環境では最小インスタンス数を1に設定
+  min_instances = var.env_suffix == "prod" ? 1 : 0
+  max_instances = 10
+
+  service_account = module.service_accounts.emails["vertex"]
+  labels          = local.common_labels
 
   depends_on = [
-    google_project_service.services["run.googleapis.com"]
+    google_vertex_ai_endpoint.prediction,
+    google_storage_bucket.data_bucket
   ]
 }
 
-# Cloud Run (prediction) を Vertex Pipeline から呼べるように
-resource "google_cloud_run_service_iam_member" "prediction_invoker" {
-  service  = module.prediction_service.service_name
-  location = local.region
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${module.service_accounts.emails["vertex-pipeline"]}"
+# Looker Studio統合
+module "looker_integration" {
+  source = "./modules/looker_integration"
+  count  = var.enable_looker_integration ? 1 : 0
+
+  project_id          = local.project_id
+  dataset_id          = module.bigquery.features_dataset_id
+  features_dataset_id = module.bigquery.features_dataset_id
+  features_table      = "mart_pool_features_labeled"
+  region              = local.region
+  common_labels       = local.common_labels
+
+  # Looker Studioは通常、エンドユーザーのGoogleアカウントで認証するためサービスアカウントは不要
+  looker_service_account = ""
+
+  depends_on = [
+    module.bigquery
+  ]
 }
