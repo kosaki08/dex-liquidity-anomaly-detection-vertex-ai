@@ -34,9 +34,9 @@ resource "google_cloud_run_v2_service" "this" {
         http_get {
           path = "/health"
         }
-        initial_delay_seconds = 10
+        initial_delay_seconds = 20
         period_seconds        = 10
-        failure_threshold     = 3
+        failure_threshold     = 5
       }
 
       liveness_probe {

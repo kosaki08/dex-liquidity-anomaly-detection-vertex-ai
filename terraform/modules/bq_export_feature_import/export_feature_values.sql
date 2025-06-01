@@ -19,4 +19,5 @@ SELECT
   hour_of_day                    AS hour_of_day,
   day_of_week                    AS day_of_week
 FROM `${project_id}.${dataset_id}.mart_pool_features_labeled`
-WHERE hour_ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR);
+WHERE hour_ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)
+  AND hour_ts < CURRENT_TIMESTAMP();

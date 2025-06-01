@@ -19,7 +19,7 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
   }
 
   # GitHubリポジトリとブランチを制限
-  attribute_condition = "attribute.repository == \"${var.github_repository}\""
+  attribute_condition = "attribute.repository == \"${var.github_repository}\" && (attribute.ref == \"refs/heads/main\" || attribute.ref == \"refs/heads/dev\" || attribute.ref == \"refs/heads/develop\")"
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
@@ -31,4 +31,11 @@ resource "google_service_account_iam_member" "github_sa_impersonation" {
   service_account_id = google_service_account.tf_apply.name
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/${var.github_organization}/${var.repository_name}"
+}
+
+# Vertex AI User 権限を付与
+resource "google_project_iam_member" "cf_vertex_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:run-vertex-dev@${var.project_id}.iam.gserviceaccount.com"
 }
