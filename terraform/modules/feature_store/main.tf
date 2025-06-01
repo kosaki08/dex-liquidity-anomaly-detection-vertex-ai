@@ -1,4 +1,4 @@
-# Feature Store の作成
+# Feature Store本体（オンライン/オフライン特徴量の永続化ストレージ）
 resource "google_vertex_ai_featurestore" "main" {
   name    = "${replace(var.project_name, "-", "_")}_featurestore_${var.env_suffix}"
   region  = var.region
@@ -11,6 +11,14 @@ resource "google_vertex_ai_featurestore" "main" {
   }
 
   depends_on = [var.aiplatform_service_dependency]
+
+  # KMS暗号化（prodのみ）
+  dynamic "encryption_spec" {
+    for_each = var.kms_key_name != null ? [1] : []
+    content {
+      kms_key_name = var.kms_key_name
+    }
+  }
 }
 
 # DEX liquidity data の Entity Type

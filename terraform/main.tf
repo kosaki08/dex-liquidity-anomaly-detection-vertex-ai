@@ -105,20 +105,6 @@ module "bigquery" {
   kms_key_name   = var.kms_key_name
 }
 
-# Vertex AI エンドポイント
-resource "google_vertex_ai_endpoint" "endpoint" {
-  name         = "${local.model_name}-endpoint-${local.env_suffix}"
-  display_name = "${local.model_name}-endpoint-${local.env_suffix}"
-  location     = local.region
-  labels = {
-    env = local.env_suffix
-  }
-
-  depends_on = [
-    google_project_service.services["aiplatform.googleapis.com"],
-  ]
-}
-
 # Feature Store
 module "feature_store" {
   source       = "./modules/feature_store"
@@ -127,6 +113,7 @@ module "feature_store" {
   project_name = "dex-anomaly-detection"
   region       = local.region
   env_suffix   = local.env_suffix
+  kms_key_name = var.kms_key_name
 
   common_labels = local.common_labels
 
@@ -188,6 +175,7 @@ module "fetcher_job_uniswap" {
   project_id            = local.project_id
   name                  = "dex-fetch-uni-${local.env_suffix}"
   region                = local.region
+  env_suffix            = local.env_suffix
   image_uri             = var.fetcher_image_uri
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
@@ -222,6 +210,7 @@ module "fetcher_job_sushiswap" {
   project_id            = local.project_id
   name                  = "dex-fetch-sushi-${local.env_suffix}"
   region                = local.region
+  env_suffix            = local.env_suffix
   image_uri             = var.fetcher_image_uri
   secret_name_graph_api = google_secret_manager_secret.api_keys["the-graph-api-key"].secret_id
   service_account       = module.service_accounts.emails["vertex"]
@@ -257,4 +246,71 @@ module "workloads" {
   env_suffix = local.env_suffix
 
   depends_on = [google_project_service.services]
+}
+
+# Vertex AI Model のデプロイ
+resource "google_vertex_ai_endpoint" "prediction" {
+  provider     = google-beta
+  name         = "dex-prediction-endpoint-${local.env_suffix}"
+  display_name = "DEX Anomaly Detection Endpoint"
+  location     = local.region
+
+  labels = local.common_labels
+}
+
+# API Gateway 用の Cloud Functions
+module "prediction_gateway" {
+  source = "./modules/cloud_functions"
+  count  = var.enable_prediction_gateway ? 1 : 0
+
+  name       = "prediction-gateway-${local.env_suffix}"
+  region     = local.region
+  project_id = local.project_id
+
+  # ソースコード格納用バケット（既存のデータバケットを使用）
+  source_bucket = google_storage_bucket.data_bucket.name
+
+  # ソースディレクトリのパス
+  source_dir = "${path.module}/../functions/prediction_gateway"
+
+  # 外部に公開するため認証なし
+  allow_unauthenticated = true
+
+  environment_variables = {
+    PROJECT_ID  = local.project_id
+    ENDPOINT_ID = split("/", google_vertex_ai_endpoint.prediction.id)[4]
+    REGION      = local.region
+  }
+
+  # 本番環境では最小インスタンス数を1に設定
+  min_instances = var.env_suffix == "prod" ? 1 : 0
+  max_instances = 10
+
+  service_account = module.service_accounts.emails["vertex"]
+  labels          = local.common_labels
+
+  depends_on = [
+    google_vertex_ai_endpoint.prediction,
+    google_storage_bucket.data_bucket
+  ]
+}
+
+# Looker Studio統合
+module "looker_integration" {
+  source = "./modules/looker_integration"
+  count  = var.enable_looker_integration ? 1 : 0
+
+  project_id          = local.project_id
+  dataset_id          = module.bigquery.features_dataset_id
+  features_dataset_id = module.bigquery.features_dataset_id
+  features_table      = "mart_pool_features_labeled"
+  region              = local.region
+  common_labels       = local.common_labels
+
+  # Looker Studioは通常、エンドユーザーのGoogleアカウントで認証するためサービスアカウントは不要
+  looker_service_account = ""
+
+  depends_on = [
+    module.bigquery
+  ]
 }

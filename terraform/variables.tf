@@ -70,8 +70,14 @@ variable "enable_feature_store" {
   default     = false
 }
 
-# variable "feature_store_node_count" {
-#   type        = number
-#   description = "Feature Store のオンライン配信ノード数"
-#   default     = 1
-# }
+variable "enable_looker_integration" {
+  type        = bool
+  description = "Looker Studio統合を有効にするか"
+  default     = true
+}
+
+variable "enable_prediction_gateway" {
+  type        = bool
+  description = "Cloud Functions予測ゲートウェイを有効にするか"
+  default     = false
+}
