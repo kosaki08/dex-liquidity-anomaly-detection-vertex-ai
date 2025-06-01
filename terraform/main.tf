@@ -12,8 +12,11 @@ resource "google_project_service" "services" {
     "secretmanager.googleapis.com",        # シークレットマネージャー用
     "run.googleapis.com",                  # Cloud Run Job 用
     "cloudscheduler.googleapis.com",       # Cloud Scheduler 用
-    "bigquerydatatransfer.googleapis.com", # ← BigQuery Scheduled Query 用
-    "dataflow.googleapis.com",             # ← Feature Store Import が内部で起動
+    "bigquerydatatransfer.googleapis.com", # BigQuery Scheduled Query 用
+    "dataflow.googleapis.com",             # Feature Store Import が内部で起動
+    "cloudfunctions.googleapis.com",       # Cloud Functions のビルド用
+    "cloudbuild.googleapis.com",           # Gen2 デプロイ時のビルド用
+    "eventarc.googleapis.com",             # HTTP トリガ用
   ])
   service = each.key
 }
@@ -291,7 +294,9 @@ module "prediction_gateway" {
 
   depends_on = [
     google_vertex_ai_endpoint.prediction,
-    google_storage_bucket.data_bucket
+    google_storage_bucket.data_bucket,
+    google_project_service.services["cloudfunctions.googleapis.com"],
+    google_project_service.services["cloudbuild.googleapis.com"],
   ]
 }
 
