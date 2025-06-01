@@ -53,13 +53,16 @@ resource "google_bigquery_table" "mv_looker_latest_status" {
   table_id   = "mv_looker_latest_status"
   project    = var.project_id
 
-  materialized_view {
+  view {
     query = templatefile("${path.module}/sql/mv_latest_status.sql", {
       project_id       = var.project_id
       dataset_id       = var.dataset_id
       features_dataset = var.features_dataset_id
       features_table   = var.features_table
     })
+
+    # ビューの作成には Legacy SQL を使用しない
+    use_legacy_sql = false
   }
   labels = var.common_labels
 }
