@@ -21,6 +21,7 @@ env:
   PROJECT_ID: ${{ secrets.PROJECT_ID }}
   ENABLE_PREDICTION_GATEWAY: ${{ vars.ENABLE_PREDICTION_GATEWAY || 'false' }}
   ENV: ${{ github.event.inputs.workspace || 'dev' }}
+  ENV_SUFFIX: ${{ github.event.inputs.workspace || 'dev' }}
 
 jobs:
   build:
@@ -150,17 +151,52 @@ jobs:
             -lock-timeout=300s
 
           # outputsを環境変数に保存
-          echo "ENDPOINT_ID=$(terraform output -raw vertex_endpoint_id)" >> "$GITHUB_ENV"
+          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_id)" >> "$GITHUB_ENV"
 
-      # 12) Model を Vertex AI にデプロイ
-      - name: Upload & Deploy model to Vertex AI
-        id: deploy_vertex
+      # 12) モデルアーティファクトの取得
+      - name: Download model artifacts from GCS
+        id: download_model
         run: |
           set -euo pipefail
 
+          # モデル格納バケット
+          MODEL_SOURCE_BUCKET="${PROJECT_ID}-models"
+
+          # GCSにモデルが存在するか確認
+          if gsutil -q stat "gs://${MODEL_SOURCE_BUCKET}/iforest/latest/model.joblib" 2>/dev/null; then
+            echo "Downloading model from GCS..."
+            mkdir -p models/iforest
+            if ! gsutil -m cp -r "gs://${MODEL_SOURCE_BUCKET}/iforest/latest/*" models/iforest/; then
+              echo "::error::Failed to download model from GCS"
+              exit 1
+            fi
+            echo "model_found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No model found in GCS. Model deployment will be skipped."
+            echo "model_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 13) Model を Vertex AI にデプロイ
+      - name: Upload & Deploy model to Vertex AI
+        id: deploy_vertex
+        if: steps.download_model.outputs.model_found == 'true'
+        run: |
+          set -euo pipefail
+
+          # ENV_SUFFIXはジョブレベルのenvで定義済みなので、そのまま使用可能
           MODEL_BUCKET="${PROJECT_ID}-data-${ENV_SUFFIX}"
+
+          # モデルファイルの存在確認
+          if [ -z "$(find models/iforest -type f -name '*.joblib' -o -name '*.pkl' -size +0c 2>/dev/null)" ]; then
+            echo "::error::No valid model files found in models/iforest"
+            exit 1
+          fi
+
+          # GCSへのアップロード
+          echo "Uploading model to gs://${MODEL_BUCKET}/models/iforest/"
           gsutil cp models/iforest/* gs://${MODEL_BUCKET}/models/iforest/
 
+          # モデルのアップロード
           MODEL_ID=$(gcloud ai models upload \
             --region="${REGION}" \
             --display-name="iforest-${ENV_SUFFIX}-$(date +%Y%m%d%H%M%S)" \
@@ -168,26 +204,44 @@ jobs:
             --container-image-uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-4:latest" \
             --format="value(name)")
 
+          echo "Model uploaded with ID: ${MODEL_ID}"
+
+          # 既存のエンドポイントを検索
           ENDPOINT_ID=$(gcloud ai endpoints list \
             --region="${REGION}" \
             --filter="displayName=dex-prediction-endpoint-${ENV_SUFFIX}" \
             --format="value(name)" || true)
 
-          # エンドポイントが無ければ作る（初回のみ）
+          # エンドポイントが無ければTerraform outputから取得
           if [ -z "$ENDPOINT_ID" ]; then
-            ENDPOINT_ID=$(terraform output -raw vertex_endpoint_id)
+            echo "Existing endpoint not found, getting from Terraform output..."
+            
+            # Terraform outputから取得（修正: vertex_ai_endpoint_id を使用）
+            ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_id 2>/dev/null || echo "")
+            
+            # それでも空の場合はエラー
+            if [ -z "$ENDPOINT_ID" ]; then
+              echo "::error::ENDPOINT_ID could not be determined from either gcloud list or terraform output"
+              exit 1
+            fi
           fi
 
+          echo "Using endpoint: ${ENDPOINT_ID}"
+
+          # モデルをエンドポイントにデプロイ
           gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
             --model="${MODEL_ID}" \
             --region="${REGION}" \
             --traffic-split=0=100 \
             --machine-type=n1-standard-2
 
-          # GitHub 環境変数へ展開
-          echo "ENDPOINT_ID=${ENDPOINT_ID##*/}" >> "$GITHUB_ENV"
+          # GitHub 環境変数へ展開（エンドポイントIDのみ抽出）
+          ENDPOINT_ID_SHORT="${ENDPOINT_ID##*/}"
+          echo "ENDPOINT_ID=${ENDPOINT_ID_SHORT}" >> "$GITHUB_ENV"
 
-      # 13) トラフィックを切り替えて古いモデルを削除
+          echo "Model deployment completed. Endpoint ID: ${ENDPOINT_ID_SHORT}"
+
+      # 14) トラフィックを切り替えて古いモデルを削除
       - name: Swap traffic & abandon old model
         if: steps.deploy_vertex.outcome == 'success'
         run: |
@@ -210,7 +264,7 @@ jobs:
               --region "${REGION}" --quiet
           fi
 
-      # 14) Cloud Functions のデプロイ
+      # 15) Cloud Functions のデプロイ
       - name: Deploy Prediction Gateway Function
         if: env.ENABLE_PREDICTION_GATEWAY == 'true'
         env:

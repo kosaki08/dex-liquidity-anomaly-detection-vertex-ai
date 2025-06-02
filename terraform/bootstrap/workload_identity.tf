@@ -19,7 +19,15 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
   }
 
   # GitHubリポジトリとブランチを制限
-  attribute_condition = "attribute.repository == \"${var.github_repository}\" && (attribute.ref == \"refs/heads/main\" || attribute.ref == \"refs/heads/dev\" || attribute.ref == \"refs/heads/develop\")"
+  attribute_condition = <<-COND
+    attribute.repository == "${var.github_repository}" &&
+    (
+      attribute.ref.startsWith("refs/heads/main")   ||
+      attribute.ref.startsWith("refs/heads/dev")    ||
+      attribute.ref.startsWith("refs/heads/develop")||
+      attribute.ref.startsWith("refs/pull/")
+    )
+  COND
 
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"

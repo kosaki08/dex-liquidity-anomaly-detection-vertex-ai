@@ -47,30 +47,22 @@ resource "google_bigquery_dataset_iam_member" "looker_viewer" {
   project    = var.project_id
 }
 
-# パフォーマンス最適化のためのマテリアライズドビュー
+# 最新ステータスを返す Looker ダッシュボード用通常ビュー
 resource "google_bigquery_table" "mv_looker_latest_status" {
   dataset_id = var.dataset_id
   table_id   = "mv_looker_latest_status"
   project    = var.project_id
 
-  materialized_view {
+  view {
     query = templatefile("${path.module}/sql/mv_latest_status.sql", {
       project_id       = var.project_id
       dataset_id       = var.dataset_id
       features_dataset = var.features_dataset_id
       features_table   = var.features_table
     })
-    enable_refresh      = true
-    refresh_interval_ms = 3900000 # 65分 = 3,900,000ミリ秒
+
+    # ビューの作成には Legacy SQL を使用しない
+    use_legacy_sql = false
   }
-
-  # パーティションとクラスタリングの設定
-  time_partitioning {
-    type  = "DAY"
-    field = "hour_ts"
-  }
-
-  clustering = ["pool_id"]
-
   labels = var.common_labels
 }

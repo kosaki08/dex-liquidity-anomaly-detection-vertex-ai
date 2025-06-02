@@ -61,6 +61,9 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
     "roles/run.admin",                       # Cloud Run Job 管理
     "roles/cloudscheduler.admin",            # Cloud Scheduler 管理
     "roles/artifactregistry.writer",         # Artifact Registry 書き込み用
+    "roles/cloudfunctions.admin",            # Gen2 関数作成用
+    "roles/eventarc.admin",                  # HTTP トリガの構成用
+    "roles/iam.workloadIdentityPoolAdmin",   # Workload Identity Pool 編集用
   ])
   project = var.project_id
   role    = each.value
@@ -89,6 +92,13 @@ resource "google_service_account_iam_member" "tf_apply_use_vertex_sa" {
 
 resource "google_service_account_iam_member" "tf_apply_use_vertex_pipeline_sa" {
   service_account_id = "projects/${var.project_id}/serviceAccounts/run-vertex-pipeline-${var.env_suffix}@${var.project_id}.iam.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
+# Cloud Functions のビルド用 SA に impersonate 権限を付与
+resource "google_service_account_iam_member" "tf_apply_actas_compute_sa" {
+  service_account_id = "projects/${var.project_id}/serviceAccounts/${var.project_number}-compute@developer.gserviceaccount.com"
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.tf_apply.email}"
 }

@@ -12,8 +12,11 @@ resource "google_project_service" "services" {
     "secretmanager.googleapis.com",        # シークレットマネージャー用
     "run.googleapis.com",                  # Cloud Run Job 用
     "cloudscheduler.googleapis.com",       # Cloud Scheduler 用
-    "bigquerydatatransfer.googleapis.com", # ← BigQuery Scheduled Query 用
-    "dataflow.googleapis.com",             # ← Feature Store Import が内部で起動
+    "bigquerydatatransfer.googleapis.com", # BigQuery Scheduled Query 用
+    "dataflow.googleapis.com",             # Feature Store Import が内部で起動
+    "cloudfunctions.googleapis.com",       # Cloud Functions のビルド用
+    "cloudbuild.googleapis.com",           # Gen2 デプロイ時のビルド用
+    "eventarc.googleapis.com",             # HTTP トリガ用
   ])
   service = each.key
 }
@@ -291,7 +294,9 @@ module "prediction_gateway" {
 
   depends_on = [
     google_vertex_ai_endpoint.prediction,
-    google_storage_bucket.data_bucket
+    google_storage_bucket.data_bucket,
+    google_project_service.services["cloudfunctions.googleapis.com"],
+    google_project_service.services["cloudbuild.googleapis.com"],
   ]
 }
 
@@ -313,4 +318,77 @@ module "looker_integration" {
   depends_on = [
     module.bigquery
   ]
+}
+
+# モデルアーティファクト用バケット
+resource "google_storage_bucket" "model_artifacts" {
+  name     = "${local.project_id}-models"
+  location = local.region
+
+  uniform_bucket_level_access = true
+
+  # バージョニング
+  versioning {
+    enabled = true
+  }
+
+  # CMEK で暗号化
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.model_bucket_key.id
+  }
+
+  lifecycle_rule {
+    condition {
+      age = 90 # 90日経過した古いバージョンを削除
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  # 最新バージョンの管理用
+  lifecycle_rule {
+    condition {
+      num_newer_versions = 5 # 最新5バージョンを保持
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  depends_on = [google_kms_crypto_key_iam_member.gcs_encrypter]
+}
+
+resource "google_storage_bucket_iam_member" "model_reader_ci" {
+  bucket = google_storage_bucket.model_artifacts.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:tf-apply-${var.env_suffix}@${local.project_id}.iam.gserviceaccount.com"
+}
+
+# モデルアーティファクト用バケットの読み取り権限付与
+resource "google_storage_bucket_iam_member" "model_reader_runtime" {
+  bucket = google_storage_bucket.model_artifacts.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${local.sa["vertex"]}"
+}
+
+# KeyRing（リージョンはバケットと同じ）
+resource "google_kms_key_ring" "artifact_models" {
+  name     = "artifact-models"
+  location = var.region
+}
+
+# CryptoKey（90 日ローテーション）
+resource "google_kms_crypto_key" "model_bucket_key" {
+  name            = "model-bucket-key"
+  key_ring        = google_kms_key_ring.artifact_models.id
+  rotation_period = "7776000s" # 90 日
+  lifecycle { prevent_destroy = true }
+}
+
+# Storage サービスアカウントに暗号化キー使用権限
+resource "google_kms_crypto_key_iam_member" "gcs_encrypter" {
+  crypto_key_id = google_kms_crypto_key.model_bucket_key.id
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:service-${local.project_number}@gs-project-accounts.iam.gserviceaccount.com"
 }
