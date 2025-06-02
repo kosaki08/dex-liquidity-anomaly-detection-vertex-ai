@@ -88,34 +88,54 @@ def test_import_feature_values_no_files(mock_client_class, mock_gcs_check):
 
 @pytest.mark.unit
 @patch("jobs.feature_import.feature_import.gcs_has_files")
-@patch("jobs.feature_import.feature_import.aiplatform_v1")
-def test_import_feature_values_success(mock_aiplatform_v1, mock_gcs_check):
-    """正常なインポートのテスト"""
+@patch("jobs.feature_import.feature_import.bigquery.Client")
+@patch("jobs.feature_import.feature_import.aiplatform_v1.FeaturestoreServiceClient")
+def test_import_feature_values_with_separated_bq(mock_fs_client_class, mock_bq_client_class, mock_gcs_check):
+    """BigQuery処理を分離したテスト"""
     # ファイル存在チェックをモック
     mock_gcs_check.return_value = True
 
-    # オペレーションのモック
-    mock_operation = Mock()
-    mock_operation.operation.name = "projects/test/operations/12345"
-    mock_operation.result.return_value = Mock()
+    # BigQueryクライアント
+    mock_bq_client = Mock()
+    mock_dataset = Mock()
+    mock_table = Mock()
+    mock_load_job = Mock()
 
-    # クライアントのモック
-    mock_client = Mock()
-    mock_client.import_feature_values.return_value = mock_operation
-    mock_client.entity_type_path.return_value = (
-        "projects/test/locations/asia-northeast1/featurestores/test-fs/entityTypes/dex_liquidity"
+    # BigQueryの動作設定
+    mock_bq_client_class.return_value = mock_bq_client
+    mock_bq_client.create_dataset.return_value = mock_dataset
+    mock_bq_client.delete_dataset.return_value = None
+
+    # データセットとテーブルの設定
+    mock_dataset.table.return_value = mock_table
+
+    # ロードジョブの設定
+    mock_load_job.result.return_value = None
+    mock_load_job.output_rows = 2  # 2行ロード
+    mock_bq_client.load_table_from_uri.return_value = mock_load_job
+
+    # Feature Storeクライアント
+    mock_fs_client = Mock()
+    mock_fs_client_class.return_value = mock_fs_client
+
+    # Feature Store関連の設定
+    mock_fs_client.entity_type_path.return_value = (
+        "projects/test-project/locations/asia-northeast1/featurestores/test-fs/entityTypes/dex_liquidity"
     )
 
-    # FeaturestoreServiceClient のモック
-    mock_aiplatform_v1.FeaturestoreServiceClient.return_value = mock_client
+    # import操作のモック
+    mock_operation = Mock()
+    mock_operation.operation.name = "projects/test-project/operations/import-12345"
 
-    # ImportFeatureValuesRequest と GcsSource のモック
-    mock_request = Mock()
-    mock_aiplatform_v1.ImportFeatureValuesRequest.return_value = mock_request
-    mock_gcs_source = Mock()
-    mock_aiplatform_v1.GcsSource.return_value = mock_gcs_source
+    # import結果のモック
+    mock_result = Mock()
+    mock_result.imported_entity_count = 2
+    mock_result.imported_feature_value_count = 26
 
-    # 実行（エラーが発生しないことを確認）
+    mock_operation.result.return_value = mock_result
+    mock_fs_client.import_feature_values.return_value = mock_operation
+
+    # 実行
     import_feature_values(
         project_id="test-project",
         region="asia-northeast1",
@@ -123,9 +143,11 @@ def test_import_feature_values_success(mock_aiplatform_v1, mock_gcs_check):
         gcs_path="gs://test-bucket/data/*",
     )
 
-    # 呼び出しの検証
-    mock_client.import_feature_values.assert_called_once()
-    mock_operation.result.assert_called_once_with(timeout=1800)
+    # 検証
+    mock_bq_client.create_dataset.assert_called_once()
+    mock_bq_client.load_table_from_uri.assert_called_once()  # load_parquetの代わり
+    mock_fs_client.import_feature_values.assert_called_once()
+    mock_bq_client.delete_dataset.assert_called_once()
 
 
 @pytest.mark.unit

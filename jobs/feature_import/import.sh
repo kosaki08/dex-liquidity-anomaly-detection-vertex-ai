@@ -26,6 +26,9 @@ if [ -z "${REGION:-}" ]; then
   exit 1
 fi
 
+# GCP Python SDK が期待する環境変数を設定
+export GOOGLE_CLOUD_PROJECT="${PROJECT_ID}"
+
 # PROJECT_ID は環境変数から Python に渡される
 # Python スクリプトを実行
 exec python /usr/local/bin/feature_import.py \
