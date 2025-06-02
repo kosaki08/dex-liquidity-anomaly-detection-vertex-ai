@@ -97,7 +97,7 @@ jobs:
             exit 1
           fi
 
-      # 9) Feature Import イメージをビルド & プッシュ
+      # 8) Feature Import イメージをビルド & プッシュ
       - name: Build & push feature-import
         id: build_import
         run: |
@@ -128,13 +128,59 @@ jobs:
             exit 1
           fi
 
-      # 10) Terraform をセットアップ
+      # 9) モデルアーティファクトの取得
+      - name: Download model artifacts from GCS
+        id: download_model
+        run: |
+          set -euo pipefail
+
+          # モデル格納バケット
+          MODEL_SOURCE_BUCKET="${PROJECT_ID}-models"
+          MODEL_PATH="iforest/latest/model.joblib"
+
+          # GCSにモデルが存在するか確認
+          if gsutil -q stat "gs://${MODEL_SOURCE_BUCKET}/${MODEL_PATH}" 2>/dev/null; then
+            echo "Downloading model from GCS..."
+            mkdir -p models/iforest
+            if ! gsutil -m cp -r "gs://${MODEL_SOURCE_BUCKET}/iforest/latest/*" models/iforest/; then
+              echo "::error::Failed to download model from GCS"
+              exit 1
+            fi
+            echo "Model downloaded successfully"
+            echo "model_found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No model found at gs://${MODEL_SOURCE_BUCKET}/${MODEL_PATH}"
+            echo "::error::Please run the following command to initialize the model:"
+            echo "::error::  ./scripts/init_model.sh ${PROJECT_ID} ${ENV_SUFFIX}"
+            echo "model_found=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      # 10) モデルアーティファクトを latest にプロモート
+      - name: Promote model artifact to latest
+        if: ${{ env.ENV_SUFFIX == 'dev' && steps.download_model.outputs.model_found == 'true' }}
+        run: |
+          set -euo pipefail
+          MODEL_BUCKET="${PROJECT_ID}-models"
+
+          # ダウンロードしたモデルが存在するか確認
+          if [ -d "models/iforest" ] && [ -n "$(find models/iforest -name '*.joblib' -type f)" ]; then
+            echo "Found local model artifacts, promoting to latest..."
+            
+            # latest ディレクトリにコピー（-n で既存ファイルを上書きしない）
+            gsutil -m cp -n models/iforest/*.joblib "gs://${MODEL_BUCKET}/iforest/latest/"
+            echo "Model artifacts promoted to latest"
+          else
+            echo "::warning::No local model artifacts found to promote"
+          fi
+
+      # 11) Terraform をセットアップ
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3.1.2
         with:
           terraform_version: 1.8.0
 
-      # 11) Terraform の適用
+      # 12) Terraform の適用
       - name: Terraform apply (dev)
         working-directory: terraform
         env:
@@ -152,29 +198,6 @@ jobs:
 
           # outputsを環境変数に保存
           echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_id)" >> "$GITHUB_ENV"
-
-      # 12) モデルアーティファクトの取得
-      - name: Download model artifacts from GCS
-        id: download_model
-        run: |
-          set -euo pipefail
-
-          # モデル格納バケット
-          MODEL_SOURCE_BUCKET="${PROJECT_ID}-models"
-
-          # GCSにモデルが存在するか確認
-          if gsutil -q stat "gs://${MODEL_SOURCE_BUCKET}/iforest/latest/model.joblib" 2>/dev/null; then
-            echo "Downloading model from GCS..."
-            mkdir -p models/iforest
-            if ! gsutil -m cp -r "gs://${MODEL_SOURCE_BUCKET}/iforest/latest/*" models/iforest/; then
-              echo "::error::Failed to download model from GCS"
-              exit 1
-            fi
-            echo "model_found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::No model found in GCS. Model deployment will be skipped."
-            echo "model_found=false" >> "$GITHUB_OUTPUT"
-          fi
 
       # 13) Model を Vertex AI にデプロイ
       - name: Upload & Deploy model to Vertex AI
