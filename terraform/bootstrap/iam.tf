@@ -96,17 +96,6 @@ resource "google_service_account_iam_member" "tf_apply_use_vertex_pipeline_sa" {
   member             = "serviceAccount:${google_service_account.tf_apply.email}"
 }
 
-# Cloud Build のビルド用 SA に impersonate 権限を付与
-resource "google_service_account_iam_member" "tf_apply_actas_cloudbuild_sa" {
-  service_account_id = "projects/${var.project_number}/serviceAccounts/${google_project_service_identity.cloudbuild_sa.email}"
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.tf_apply.email}"
-
-  depends_on = [
-    google_project_service_identity.cloudbuild_sa
-  ]
-}
-
 # Cloud Run Jobs の権限付与
 resource "google_project_iam_member" "tf_sa_run_jobs" {
   project = var.project_id
