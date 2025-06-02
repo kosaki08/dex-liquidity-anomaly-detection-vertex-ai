@@ -327,8 +327,14 @@ resource "google_storage_bucket" "model_artifacts" {
 
   uniform_bucket_level_access = true
 
+  # バージョニング
   versioning {
     enabled = true
+  }
+
+  # CMEK で暗号化
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.model_bucket_key.id
   }
 
   lifecycle_rule {
@@ -349,17 +355,14 @@ resource "google_storage_bucket" "model_artifacts" {
       type = "Delete"
     }
   }
+
+  depends_on = [google_kms_crypto_key_iam_member.gcs_encrypter]
 }
 
 resource "google_storage_bucket_iam_member" "model_reader_ci" {
-  for_each = {
-    # dev ワークスペースなら dev だけ、prod なら prod だけ
-    "${var.env_suffix}" = "serviceAccount:tf-apply-${var.env_suffix}@${local.project_id}.iam.gserviceaccount.com"
-  }
-
   bucket = google_storage_bucket.model_artifacts.name
   role   = "roles/storage.objectViewer"
-  member = "serviceAccount:tf-apply-${each.key}@${local.project_id}.iam.gserviceaccount.com"
+  member = "serviceAccount:tf-apply-${var.env_suffix}@${local.project_id}.iam.gserviceaccount.com"
 }
 
 # モデルアーティファクト用バケットの読み取り権限付与
@@ -367,4 +370,25 @@ resource "google_storage_bucket_iam_member" "model_reader_runtime" {
   bucket = google_storage_bucket.model_artifacts.name
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${local.sa["vertex"]}"
+}
+
+# KeyRing（リージョンはバケットと同じ）
+resource "google_kms_key_ring" "artifact_models" {
+  name     = "artifact-models"
+  location = var.region
+}
+
+# CryptoKey（90 日ローテーション）
+resource "google_kms_crypto_key" "model_bucket_key" {
+  name            = "model-bucket-key"
+  key_ring        = google_kms_key_ring.artifact_models.id
+  rotation_period = "7776000s" # 90 日
+  lifecycle { prevent_destroy = true }
+}
+
+# Storage サービスアカウントに暗号化キー使用権限
+resource "google_kms_crypto_key_iam_member" "gcs_encrypter" {
+  crypto_key_id = google_kms_crypto_key.model_bucket_key.id
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:service-${local.project_number}@gs-project-accounts.iam.gserviceaccount.com"
 }
