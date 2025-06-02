@@ -22,12 +22,10 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
   attribute_condition = <<-CEL
     attribute.repository == "${var.github_repository}" &&
     (
-      # 通常ブランチ
-      attribute.ref.startsWith("refs/heads/main") ||
-      attribute.ref.startsWith("refs/heads/dev")  ||
-      attribute.ref.startsWith("refs/heads/develop") ||
-      # PR ビルド
-      attribute.ref.startsWith("refs/pull/")
+      startsWith(attribute.ref, "refs/heads/main")   ||
+      startsWith(attribute.ref, "refs/heads/dev")    ||
+      startsWith(attribute.ref, "refs/heads/develop")||
+      startsWith(attribute.ref, "refs/pull/")
     )
   CEL
 
