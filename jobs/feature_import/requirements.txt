@@ -1,0 +1,2 @@
+google-cloud-aiplatform~=1.95
+google-cloud-storage>=2.18,<3.0

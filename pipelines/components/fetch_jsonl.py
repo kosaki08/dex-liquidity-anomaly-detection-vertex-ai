@@ -1,27 +1,23 @@
+import logging
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
-# ruff: noqa
+from kfp.v2.dsl import Dataset, Output, component
+
 proj_root = Path(__file__).resolve().parents[2]
 if str(proj_root) not in sys.path:
     sys.path.append(str(proj_root))
 
-import logging
-import shutil
-import tempfile
-from typing import Annotated
-
-
-from kfp.v2.dsl import component, Dataset, Output
-
-from scripts.fetcher.run_fetch import fetch_pool_data
+from src.data.fetcher.run_fetch import fetch_pool_data  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 @component(
     base_image="python:3.11-slim",
-    packages_to_install=["requests==2.32.3", "google-cloud-storage==2.16.0"],
+    packages_to_install=["requests==2.32.3", "google-cloud-storage==3.1.0"],
 )
 def fetch_jsonl(
     protocol: str,
