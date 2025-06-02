@@ -319,3 +319,49 @@ module "looker_integration" {
     module.bigquery
   ]
 }
+
+# モデルアーティファクト用バケット
+resource "google_storage_bucket" "model_artifacts" {
+  name     = "${local.project_id}-models"
+  location = local.region
+
+  uniform_bucket_level_access = true
+
+  versioning {
+    enabled = true
+  }
+
+  lifecycle_rule {
+    condition {
+      age = 90 # 90日経過した古いバージョンを削除
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  # 最新バージョンの管理用
+  lifecycle_rule {
+    condition {
+      num_newer_versions = 5 # 最新5バージョンを保持
+    }
+    action {
+      type = "Delete"
+    }
+  }
+}
+
+resource "google_storage_bucket_iam_member" "model_reader_ci" {
+  for_each = toset(["dev", "prod"])
+
+  bucket = google_storage_bucket.model_artifacts.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:tf-apply-${each.key}@${local.project_id}.iam.gserviceaccount.com"
+}
+
+# モデルアーティファクト用バケットの読み取り権限付与
+resource "google_storage_bucket_iam_member" "model_reader_runtime" {
+  bucket = google_storage_bucket.model_artifacts.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${local.sa["vertex"]}"
+}

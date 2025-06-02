@@ -153,9 +153,33 @@ jobs:
           # outputsを環境変数に保存
           echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_id)" >> "$GITHUB_ENV"
 
-      # 12) Model を Vertex AI にデプロイ
+      # 12) モデルアーティファクトの取得
+      - name: Download model artifacts from GCS
+        id: download_model
+        run: |
+          set -euo pipefail
+
+          # モデル格納バケット
+          MODEL_SOURCE_BUCKET="${PROJECT_ID}-models"
+
+          # GCSにモデルが存在するか確認
+          if gsutil -q stat "gs://${MODEL_SOURCE_BUCKET}/iforest/latest/model.joblib" 2>/dev/null; then
+            echo "Downloading model from GCS..."
+            mkdir -p models/iforest
+            if ! gsutil -m cp -r "gs://${MODEL_SOURCE_BUCKET}/iforest/latest/*" models/iforest/; then
+              echo "::error::Failed to download model from GCS"
+              exit 1
+            fi
+            echo "model_found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No model found in GCS. Model deployment will be skipped."
+            echo "model_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 13) Model を Vertex AI にデプロイ
       - name: Upload & Deploy model to Vertex AI
         id: deploy_vertex
+        if: steps.download_model.outputs.model_found == 'true'
         run: |
           set -euo pipefail
 
@@ -163,8 +187,8 @@ jobs:
           MODEL_BUCKET="${PROJECT_ID}-data-${ENV_SUFFIX}"
 
           # モデルファイルの存在確認
-          if [ ! -d "models/iforest" ]; then
-            echo "::error::Model directory 'models/iforest' not found"
+          if [ -z "$(find models/iforest -type f -name '*.joblib' -o -name '*.pkl' -size +0c 2>/dev/null)" ]; then
+            echo "::error::No valid model files found in models/iforest"
             exit 1
           fi
 
@@ -217,7 +241,7 @@ jobs:
 
           echo "Model deployment completed. Endpoint ID: ${ENDPOINT_ID_SHORT}"
 
-      # 13) トラフィックを切り替えて古いモデルを削除
+      # 14) トラフィックを切り替えて古いモデルを削除
       - name: Swap traffic & abandon old model
         if: steps.deploy_vertex.outcome == 'success'
         run: |
@@ -240,7 +264,7 @@ jobs:
               --region "${REGION}" --quiet
           fi
 
-      # 14) Cloud Functions のデプロイ
+      # 15) Cloud Functions のデプロイ
       - name: Deploy Prediction Gateway Function
         if: env.ENABLE_PREDICTION_GATEWAY == 'true'
         env:
