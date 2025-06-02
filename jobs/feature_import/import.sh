@@ -1,67 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Cloud SDK デフォルトリージョンを設定
-gcloud config set ai/region "${REGION}"
-
-# ファイルが1つも無ければ何もせず終了
-if ! gsutil -q stat "${GCS_PATH}"; then
-  echo "no files to import - exit 0"
-  exit 0
-fi
-
-# フィールドパスを指定
-FIELD_PATH="stats.entityCount"
-
-# インポート前の行数を記録
-BEFORE_COUNT=$(gcloud ai featurestore entity-types describe dex_liquidity \
-  --featurestore="${FEATURESTORE_ID}" \
-  --region="${REGION}" \
-  --format="value(${FIELD_PATH})" || echo "0")
-
-# Feature Store へのインポート（非同期に変更）
-IMPORT_JOB=$(gcloud ai featurestore entity-types import feature-values \
-  --featurestore="${FEATURESTORE_ID}" \
-  --entity-type=dex_liquidity \
-  --region="${REGION}" \
-  --import-schema-uri=gs://google-cloud-aiplatform/schema/featurestore/import_feature_values_parquet.yaml \
-  --gcs-source-uri="${GCS_PATH}" \
-  --feature-time-field=feature_timestamp \
-  --worker-count=1 \
-  --format="value(name)")
-
-# ジョブの完了を監視（最大30分）
-TIMEOUT=1800
-ELAPSED=0
-while [ $ELAPSED -lt $TIMEOUT ]; do
-  STATUS=$(gcloud ai operations describe "${IMPORT_JOB}" --format="value(done)")
-
-  if [ "$STATUS" = "True" ]; then
-    # エラーチェック
-    ERROR=$(gcloud ai operations describe "${IMPORT_JOB}" --format="value(error.message)")
-    if [ -n "$ERROR" ]; then
-      echo "Import failed: $ERROR" >&2
-      exit 1
-    fi
-    break
-  fi
-  sleep 30
-  ELAPSED=$((ELAPSED + 30))
-done
-
-# タイムアウトチェック
-if [ $ELAPSED -ge $TIMEOUT ]; then
-  echo "Import timeout after ${TIMEOUT} seconds" >&2
+# 環境変数のバリデーション
+# PROJECT_ID
+if [ -z "${PROJECT_ID:-}" ]; then
+  echo "Error: PROJECT_ID is not set" >&2
   exit 1
 fi
 
-# entityCountの遅延を考慮して少し待つ
-sleep 10
+# FEATURESTORE_ID
+if [ -z "${FEATURESTORE_ID:-}" ]; then
+  echo "Error: FEATURESTORE_ID is not set" >&2
+  exit 1
+fi
 
-# インポート後の検証
-AFTER_COUNT=$(gcloud ai featurestore entity-types describe dex_liquidity \
-  --featurestore="${FEATURESTORE_ID}" \
-  --region="${REGION}" \
-  --format="value(${FIELD_PATH})" || echo "0")
+# GCS_PATH
+if [ -z "${GCS_PATH:-}" ]; then
+  echo "Error: GCS_PATH is not set" >&2
+  exit 1
+fi
 
-echo "Import complete: before=$BEFORE_COUNT, after=$AFTER_COUNT"
+# REGION
+if [ -z "${REGION:-}" ]; then
+  echo "Error: REGION is not set" >&2
+  exit 1
+fi
+
+# GCP Python SDK が期待する環境変数を設定
+export GOOGLE_CLOUD_PROJECT="${PROJECT_ID}"
+
+# PROJECT_ID は環境変数から Python に渡される
+# Python スクリプトを実行
+exec python /usr/local/bin/feature_import.py \
+  --featurestore_id "${FEATURESTORE_ID}" \
+  --gcs_path "${GCS_PATH}" \
+  --region "${REGION}"
