@@ -352,7 +352,10 @@ resource "google_storage_bucket" "model_artifacts" {
 }
 
 resource "google_storage_bucket_iam_member" "model_reader_ci" {
-  for_each = toset(["dev", "prod"])
+  for_each = {
+    # dev ワークスペースなら dev だけ、prod なら prod だけ
+    "${var.env_suffix}" = "serviceAccount:tf-apply-${var.env_suffix}@${local.project_id}.iam.gserviceaccount.com"
+  }
 
   bucket = google_storage_bucket.model_artifacts.name
   role   = "roles/storage.objectViewer"
