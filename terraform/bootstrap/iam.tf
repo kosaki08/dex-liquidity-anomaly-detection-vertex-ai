@@ -103,6 +103,13 @@ resource "google_service_account_iam_member" "tf_apply_actas_compute_sa" {
   member             = "serviceAccount:${google_service_account.tf_apply.email}"
 }
 
+# Cloud Build のビルド用 SA に impersonate 権限を付与
+resource "google_service_account_iam_member" "tf_apply_actas_cloudbuild_sa" {
+  service_account_id = "projects/${var.project_id}/serviceAccounts/${var.project_id}-cloudbuild@cloudbuild.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.tf_apply.email}"
+}
+
 # Cloud Run Jobs の権限付与
 resource "google_project_iam_member" "tf_sa_run_jobs" {
   project = var.project_id
