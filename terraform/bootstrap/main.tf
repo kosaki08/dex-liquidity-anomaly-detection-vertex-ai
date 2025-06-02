@@ -4,7 +4,8 @@ resource "google_project_service" "services" {
     "cloudkms.googleapis.com",
     "iam.googleapis.com",
     "cloudresourcemanager.googleapis.com",
-    "iamcredentials.googleapis.com"
+    "iamcredentials.googleapis.com",
+    "cloudbuild.googleapis.com"
   ])
   service = each.key
 
@@ -77,4 +78,11 @@ resource "google_kms_crypto_key_iam_member" "gcs_object_encrypter" {
   crypto_key_id = google_kms_crypto_key.terraform_state.id
   role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
   member        = "serviceAccount:service-${var.project_number}@gs-project-accounts.iam.gserviceaccount.com"
+}
+
+# Cloud Build Service Identity
+resource "google_project_service_identity" "cloudbuild_sa" {
+  provider = google-beta
+  project  = var.project_id
+  service  = "cloudbuild.googleapis.com"
 }
