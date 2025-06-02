@@ -12,7 +12,7 @@ from google.api_core.exceptions import PreconditionFailed
 from google.cloud import bigquery, storage
 from google.cloud.bigquery import SchemaField
 
-from data.fetcher.run_fetch import fetch_pool_data
+from src.data.fetcher.run_fetch import fetch_pool_data  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

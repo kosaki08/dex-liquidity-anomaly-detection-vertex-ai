@@ -64,6 +64,7 @@ resource "google_project_iam_member" "tf_sa_admin_roles" {
     "roles/cloudfunctions.admin",            # Gen2 関数作成用
     "roles/eventarc.admin",                  # HTTP トリガの構成用
     "roles/iam.workloadIdentityPoolAdmin",   # Workload Identity Pool 編集用
+    "roles/cloudkms.admin",                  # KMS KeyRing/CryptoKey 作成権限
   ])
   project = var.project_id
   role    = each.value

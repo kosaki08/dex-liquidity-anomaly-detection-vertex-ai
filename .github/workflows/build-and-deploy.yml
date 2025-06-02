@@ -108,7 +108,7 @@ jobs:
           docker buildx build --platform linux/amd64 \
             -t "$IMG" \
             -t "$REGION-docker.pkg.dev/$PROJECT_ID/ml/feature-import:latest" \
-            -f jobs/feature_import/Dockerfile jobs/feature_import \
+            -f jobs/feature_import/Dockerfile . \
             --push \
             --metadata-file "$METAFILE"
 
