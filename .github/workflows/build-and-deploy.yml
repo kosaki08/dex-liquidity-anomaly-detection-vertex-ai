@@ -199,8 +199,7 @@ jobs:
             -lock-timeout=300s
 
           # outputsを環境変数に保存
-          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_numeric_id)" >> "$GITHUB_ENV"
-          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_numeric_id)"
+          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_name)" >> "$GITHUB_ENV"
 
       # 13) Model をビルド
       - name: Build model artifact
@@ -259,21 +258,29 @@ jobs:
           echo "Uploading Vertex Model from ${MODEL_URI}..."
 
           # モデルアップロード実行
-          MODEL_RESOURCE=$(gcloud ai models upload \
+          MODEL_JSON=$(gcloud ai models upload \
             --region="${REGION}" \
             --display-name="${MODEL_DISPLAY_NAME}" \
             --artifact-uri="${MODEL_URI}" \
             --container-image-uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-4:latest" \
-            --format="value(name)")
+            --format=json)
 
-          # モデルIDを抽出（リソース名の最後のセグメント）
-          MODEL_ID=$(basename "${MODEL_RESOURCE}")
+          # JSONからモデルIDを抽出
+          MODEL_RESOURCE=$(echo "${MODEL_JSON}" | jq -r '.name')
+          MODEL_ID=$(echo "${MODEL_JSON}" | jq -r '.name' | rev | cut -d'/' -f1 | rev)
+
+          # 値の確認
+          if [[ -z "${MODEL_ID}" ]] || [[ "${MODEL_ID}" == "null" ]]; then
+            echo "::error::Failed to extract model ID from response"
+            echo "Response was: ${MODEL_JSON}"
+            exit 1
+          fi
 
           echo "Model uploaded successfully"
           echo "MODEL_RESOURCE=${MODEL_RESOURCE}"
           echo "MODEL_ID=${MODEL_ID}"
 
-          # 次のステップで使用するための出力（改行なしで終了）
+          # 次のステップで使用するための出力
           echo "model_id=${MODEL_ID}" >> "$GITHUB_OUTPUT"
 
       # 16) Model を Endpoint にデプロイ
@@ -284,52 +291,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           REGION="${{ env.REGION }}"
           MODEL_ID="${{ steps.upload_model.outputs.model_id }}"
 
           echo "ENDPOINT_ID=${ENDPOINT_ID}"
-          if [ -z "${ENDPOINT_ID}" ]; then
-            echo "::error::ENDPOINT_ID is empty"
-            exit 1
-          fi
+          [[ -z "$ENDPOINT_ID" ]] && { echo "::error::ENDPOINT_ID empty"; exit 1; }
 
-          # dev 環境は事前に全アンデプロイ（リソース節約）
+          # dev は既存モデルを全て外す
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
-            echo "Undeploying any existing models (dev only)…"
-            gcloud ai endpoints undeploy-model "${ENDPOINT_ID}" --all --region="${REGION}" --quiet || true
+            ( gcloud ai endpoints undeploy-model "$ENDPOINT_ID" --all --region="$REGION" --quiet || true )
           fi
 
           # デプロイ
-          echo "Deploying model ${MODEL_ID} to endpoint ${ENDPOINT_ID} ..."
-          OP=$(gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
-            --region="${REGION}" \
-            --model="${MODEL_ID}" \
-            --display-name="iforest-${VERSION}" \
-            --machine-type=$([[ "${{ github.ref_name }}" == "dev" ]] && echo "n1-standard-2" || echo "n1-standard-4") \
-            --min-replica-count=1 \
-            --max-replica-count=3 \
-            --traffic-split=0=100 \
-            --format="value(name)")
+          OP=$(gcloud ai endpoints deploy-model "$ENDPOINT_ID" \
+                --region="$REGION" \
+                --model="$MODEL_ID" \
+                --display-name="iforest-${VERSION}" \
+                --machine-type=$([[ "${{ github.ref_name }}" == "dev" ]] && echo "n1-standard-2" || echo "n1-standard-4") \
+                --min-replica-count=1 --max-replica-count=3 \
+                --traffic-split=0=100 \
+                --format="value(name)")
 
-          echo "Operation: $OP"
-          echo "Waiting for deployment to finish…"
-          if ! gcloud ai operations wait "$OP" --region="${REGION}" --timeout=1200; then
-            echo "::error::Deployment failed or timed out"
-            gcloud ai operations describe "$OP" --region="${REGION}"
-            exit 1
-          fi
+          echo "Operation=$OP  → waiting..."
+          for i in {1..40}; do
+            [[ "$(gcloud ai operations describe "$OP" --region="$REGION" --format='value(done)')" == "True" ]] && break
+            sleep 30
+          done
 
-          # 検証
-          echo "Verifying deployed models…"
-          COUNT=$(gcloud ai endpoints describe "${ENDPOINT_ID}" \
-            --region="${REGION}" \
-            --format="value(deployedModels.id.len())")
-          if [[ "$COUNT" -eq 0 ]]; then
-            echo "::error::No models deployed after operation completed"
-            exit 1
-          fi
-          echo "Deployment succeeded (deployedModels=$COUNT)"
+          ERR=$(gcloud ai operations describe "$OP" --region="$REGION" --format='value(error.code)')
+          [[ -n "$ERR" && "$ERR" != "0" ]] && { echo "::error::Deploy failed (error $ERR)"; exit 1; }
+
+          COUNT=$(gcloud ai endpoints describe "$ENDPOINT_ID" --region="$REGION" --format='value(deployedModels.id.len())')
+          [[ "$COUNT" -eq 0 ]] && { echo "::error::No models deployed"; exit 1; }
+          echo "Deployment succeeded (models=$COUNT)"
 
       # 17) トラフィックを切り替えて古いモデルを削除
       - name: Swap traffic & abandon old model

@@ -32,9 +32,3 @@ output "entitytype_id" {
   description = "作成された Entity Type の ID"
   value       = try(module.feature_store[0].entitytype_id, null)
 }
-
-output "vertex_ai_endpoint_numeric_id" {
-  description = "Vertex AI Endpoint の数値 ID"
-  value       = split("/", google_vertex_ai_endpoint.prediction.id)[length(split("/", google_vertex_ai_endpoint.prediction.id)) - 1]
-}
-
