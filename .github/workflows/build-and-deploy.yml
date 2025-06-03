@@ -199,7 +199,7 @@ jobs:
             -lock-timeout=300s
 
           # outputsを環境変数に保存
-          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_id)" >> "$GITHUB_ENV"
+          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_name)" >> "$GITHUB_ENV"
 
       # 13) Model をビルド
       - name: Build model artifact
@@ -239,73 +239,140 @@ jobs:
           gsutil -m rsync -r -d vertex_artifact/${VERSION}/ \
             gs://${MODEL_BUCKET}/${MODEL_NAME}/latest/
 
-      # 15) Model を Vertex AI にデプロイ
-      - name: Upload & Deploy model to Vertex AI
-        id: deploy_vertex
+      # 15) Model を Vertex AI にアップロード
+      - name: Upload model to Vertex AI
+        id: upload_model
         shell: bash
         run: |
           set -euo pipefail
 
           MODEL_DISPLAY_NAME="iforest-${VERSION}"
-          # --- maintenance: VERSIONディレクトリを指定
           MODEL_URI="gs://${MODEL_BUCKET}/${MODEL_NAME}/${VERSION}"
 
+          # アーティファクトの存在確認
+          if ! gsutil -q stat "${MODEL_URI}/model.joblib"; then
+            echo "::error::Model artifact not found at ${MODEL_URI}"
+            exit 1
+          fi
+
           echo "Uploading Vertex Model from ${MODEL_URI}..."
-          MODEL_ID=$(gcloud ai models upload \
+
+          # モデルアップロード実行
+          MODEL_RESOURCE=$(gcloud ai models upload \
             --region="${REGION}" \
             --display-name="${MODEL_DISPLAY_NAME}" \
             --artifact-uri="${MODEL_URI}" \
             --container-image-uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-4:latest" \
             --format="value(name)")
 
-      # 16) トラフィックを切り替えて古いモデルを削除
+          # モデルIDを抽出（リソース名の最後のセグメント）
+          MODEL_ID=$(basename "${MODEL_RESOURCE}")
+
+          echo "Model uploaded successfully"
+          echo "MODEL_RESOURCE=${MODEL_RESOURCE}"
+          echo "MODEL_ID=${MODEL_ID}"
+
+          # 次のステップで使用するための出力（改行なしで終了）
+          echo "model_id=${MODEL_ID}" >> "$GITHUB_OUTPUT"
+
+      # 16) Model を Endpoint にデプロイ
+      # Vertex AIではモデルのアップロードとエンドポイントへのデプロイは別API
+      - name: Deploy model to endpoint
+        id: deploy_model
+        if: steps.upload_model.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MODEL_ID="${{ steps.upload_model.outputs.model_id }}"
+
+          # ENDPOINT_ID の検証
+          if [ -z "${ENDPOINT_ID}" ]; then
+            echo "::error::ENDPOINT_ID is empty"
+            exit 1
+          fi
+
+          echo "Deploying model ${MODEL_ID} to endpoint ${ENDPOINT_ID}..."
+
+          # デプロイ前の状態を記録（デバッグ用）
+          echo "Current deployed models:"
+          gcloud ai endpoints describe "${ENDPOINT_ID}" \
+            --region="${REGION}" \
+            --format="value(deployedModels[].id)" || echo "No models deployed"
+
+          # デプロイ実行（--sync で同期実行）
+          # --traffic-split=0=100 は新規デプロイモデル（ID=0）に100%トラフィックを割り当て
+          gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
+            --region="${REGION}" \
+            --model="${MODEL_ID}" \
+            --display-name="iforest-${VERSION}" \
+            --machine-type="n1-standard-4" \
+            --min-replica-count=1 \
+            --max-replica-count=3 \
+            --traffic-split=0=100 \
+            --sync
+
+          # デプロイ検証：deployedModels が空でないことを確認
+          DEPLOYED_MODELS=$(gcloud ai endpoints describe "${ENDPOINT_ID}" \
+            --region="${REGION}" \
+            --format="value(deployedModels[].id)")
+
+          if [[ -z "${DEPLOYED_MODELS}" ]] || [[ "${DEPLOYED_MODELS}" == "[]" ]]; then
+            echo "::error::Deployment reported success but deployedModels is empty"
+            exit 1
+          fi
+
+          echo "Model deployment completed successfully"
+          echo "Deployed models: ${DEPLOYED_MODELS}"
+
+      # 17) トラフィックを切り替えて古いモデルを削除
       - name: Swap traffic & abandon old model
-        if: steps.deploy_vertex.outcome == 'success'
+        if: |
+          steps.deploy_model.outcome == 'success' &&
+          github.ref_name == 'dev'
+        shell: bash
         run: |
           set -euo pipefail
           REGION="${{ env.REGION }}"
           ENDPOINT="${ENDPOINT_ID}"
-          # 直近 2 モデル取得
-          MODELS=$(gcloud ai endpoints describe "${ENDPOINT}" --region "${REGION}" \
-                    --format="value(deployedModels[].id)")
-          NEW_MODEL=$(echo "${MODELS}" | cut -d',' -f1)
-          OLD_MODEL=$(echo "${MODELS}" | cut -d',' -f2 || true)
 
-          # 旧モデルがあれば split を切り替えて 0%→delete
-          if [ -n "${OLD_MODEL}" ]; then
-            gcloud ai endpoints update "${ENDPOINT}" \
-              --region "${REGION}" \
-              --traffic-split="${OLD_MODEL}=0,${NEW_MODEL}=100"
-            gcloud ai endpoints undeploy-model "${ENDPOINT}" \
-              --deployed-model-id="${OLD_MODEL}" \
-              --region "${REGION}" --quiet
+          # デプロイ済みモデルをcreateTime降順で取得（新しい順）
+          echo "Getting deployed models sorted by createTime..."
+          readarray -t DEPLOYED_MODEL_INFO < <(
+            gcloud ai endpoints describe "${ENDPOINT}" --region "${REGION}" \
+              --format="csv[no-heading](deployedModels[].createTime,deployedModels[].id)" |
+            sort -r
+          )
+
+          # モデルが2つ未満の場合はスキップ
+          if [[ ${#DEPLOYED_MODEL_INFO[@]} -lt 2 ]]; then
+            echo "Only ${#DEPLOYED_MODEL_INFO[@]} model(s) deployed - skipping traffic swap"
+            exit 0
           fi
 
-      # 17) Cloud Functions のデプロイ
-      - name: Deploy Prediction Gateway Function
-        if: env.ENABLE_PREDICTION_GATEWAY == 'true'
-        env:
-          ENV_SUFFIX: ${{ env.ENV_SUFFIX }}
-          REGION: ${{ env.REGION }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-        run: |
-          set -euo pipefail
+          # 最新2つのモデルIDを抽出
+          NEW_MODEL=$(echo "${DEPLOYED_MODEL_INFO[0]}" | cut -d',' -f2)
+          OLD_MODEL=$(echo "${DEPLOYED_MODEL_INFO[1]}" | cut -d',' -f2)
 
-          # 変数の定義
-          FUNC="dex-prediction-gateway-${ENV_SUFFIX}"
+          echo "Model deployment order (newest first):"
+          echo "  NEW: ${NEW_MODEL} (created: $(echo "${DEPLOYED_MODEL_INFO[0]}" | cut -d',' -f1))"
+          echo "  OLD: ${OLD_MODEL} (created: $(echo "${DEPLOYED_MODEL_INFO[1]}" | cut -d',' -f1))"
 
-          # ALLOWED_ORIGINS を prefix 追加
-          ALLOWED_ORIGINS="https://lookerstudio.google.com"
-          [ "$ENV_SUFFIX" = "dev" ] && ALLOWED_ORIGINS+=",http://localhost:3000"
+          # 現在のトラフィック分割を確認
+          echo "Current traffic split:"
+          gcloud ai endpoints describe "${ENDPOINT}" --region "${REGION}" \
+            --format="table(trafficSplit)"
 
-          # デプロイ
-          gcloud functions deploy "$FUNC" \
-            --gen2 \
-            --runtime python311 \
+          # トラフィック分割を更新（古いモデルを0%、新しいモデルを100%）
+          echo "Updating traffic: OLD=${OLD_MODEL} (0%), NEW=${NEW_MODEL} (100%)"
+          gcloud ai endpoints update "${ENDPOINT}" \
             --region "${REGION}" \
-            --source functions/prediction_gateway \
-            --entry-point predict \
-            --trigger-http \
-            --allow-unauthenticated \
-            --min-instances=$([ "$ENV_SUFFIX" = "prod" ] && echo 1 || echo 0) \
-            --set-env-vars="^|^PROJECT_ID=${PROJECT_ID}|ENDPOINT_ID=${ENDPOINT_ID}|REGION=${REGION}|ALLOWED_ORIGINS=${ALLOWED_ORIGINS}"
+            --traffic-split="${OLD_MODEL}=0,${NEW_MODEL}=100"
+
+          # 古いモデルをアンデプロイ
+          echo "Undeploying old model: ${OLD_MODEL}"
+          gcloud ai endpoints undeploy-model "${ENDPOINT}" \
+            --deployed-model-id="${OLD_MODEL}" \
+            --region "${REGION}" --quiet
+
+          echo "Traffic swap completed successfully"
