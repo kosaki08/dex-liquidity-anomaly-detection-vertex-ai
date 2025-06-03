@@ -266,13 +266,19 @@ jobs:
             --format=json)
 
           # JSONからモデルIDを抽出
-          MODEL_RESOURCE=$(echo "${MODEL_JSON}" | jq -r '.name')
-          MODEL_ID=$(echo "${MODEL_JSON}" | jq -r '.name' | rev | cut -d'/' -f1 | rev)
+          MODEL_RESOURCE=$(echo "${MODEL_JSON}" | jq -r '.model // .name // empty')
+          if [[ -z "${MODEL_RESOURCE}" ]]; then
+            echo "::error::Failed to extract model resource from response"
+            echo "Response was: ${MODEL_JSON}"
+            exit 1
+          fi
+          MODEL_ID=$(echo "${MODEL_RESOURCE}" | rev | cut -d'/' -f1 | rev)
 
           # 値の確認
           if [[ -z "${MODEL_ID}" ]] || [[ "${MODEL_ID}" == "null" ]]; then
             echo "::error::Failed to extract model ID from response"
-            echo "Response was: ${MODEL_JSON}"
+            echo "MODEL_RESOURCE was: ${MODEL_RESOURCE}"
+            echo "Full response was: ${MODEL_JSON}"
             exit 1
           fi
 
