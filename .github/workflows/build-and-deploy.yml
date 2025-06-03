@@ -20,8 +20,10 @@ env:
   REGION: asia-northeast1
   PROJECT_ID: ${{ secrets.PROJECT_ID }}
   ENABLE_PREDICTION_GATEWAY: ${{ vars.ENABLE_PREDICTION_GATEWAY || 'false' }}
-  ENV: ${{ github.event.inputs.workspace || 'dev' }}
   ENV_SUFFIX: ${{ github.event.inputs.workspace || 'dev' }}
+  VERSION: v${{ github.run_number }}
+  MODEL_NAME: iforest
+  MODEL_BUCKET: ${{ secrets.PROJECT_ID }}-models
 
 jobs:
   build:
@@ -199,87 +201,64 @@ jobs:
           # outputsを環境変数に保存
           echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_id)" >> "$GITHUB_ENV"
 
-      # 13) Model を Vertex AI にデプロイ
-      - name: Upload & Deploy model to Vertex AI
-        id: deploy_vertex
-        if: steps.download_model.outputs.model_found == 'true'
+      # 13) Model をビルド
+      - name: Build model artifact
+        id: build_model
         run: |
           set -euo pipefail
 
-          # ENV_SUFFIXはジョブレベルのenvで定義済みなので、そのまま使用可能
-          MODEL_BUCKET="${PROJECT_ID}-data-${ENV_SUFFIX}"
+          # Python環境セットアップ
+          python3 -m pip install --quiet scikit-learn==1.4.2 joblib==1.4.2 numpy==1.26.4
 
-          # モデルファイルの存在確認
-          if [ -z "$(find models/iforest -type f -name '*.joblib' -o -name '*.pkl' -size +0c 2>/dev/null)" ]; then
-            echo "::error::No valid model files found in models/iforest"
+          # モデルアーティファクト生成
+          echo "Building model artifact version ${VERSION}..."
+          python3 scripts/train_iforest.py \
+            --out vertex_artifact/${VERSION} \
+            --version ${VERSION}
+
+          # 生成確認
+          if [[ ! -f "vertex_artifact/${VERSION}/model.joblib" ]]; then
+            echo "::error::Model artifact generation failed"
             exit 1
           fi
 
-          # GCSへのアップロード
-          echo "Uploading model to gs://${MODEL_BUCKET}/models/iforest/"
-          gsutil cp models/iforest/* gs://${MODEL_BUCKET}/models/iforest/
+          echo "model_generated=true" >> "$GITHUB_OUTPUT"
 
-          # モデルのアップロード（JSON形式で取得）
-          echo "Uploading model to Vertex AI..."
-          MODEL_UPLOAD_OUTPUT=$(gcloud ai models upload \
+      # 14) Model を GCS にアップロード
+      - name: Upload model artifact
+        if: steps.build_model.outputs.model_generated == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # VERSION付きディレクトリをアップロード
+          gsutil -m rsync -r -d vertex_artifact/${VERSION}/ \
+            gs://${MODEL_BUCKET}/${MODEL_NAME}/${VERSION}/
+
+          # latestを更新
+          gsutil -m rsync -r -d vertex_artifact/${VERSION}/ \
+            gs://${MODEL_BUCKET}/${MODEL_NAME}/latest/
+
+      # 15) Model を Vertex AI にデプロイ
+      - name: Upload & Deploy model to Vertex AI
+        id: deploy_vertex
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MODEL_DISPLAY_NAME="iforest-${VERSION}"
+          # --- maintenance: VERSIONディレクトリを指定
+          MODEL_URI="gs://${MODEL_BUCKET}/${MODEL_NAME}/${VERSION}"
+
+          echo "Uploading Vertex Model from ${MODEL_URI}..."
+          MODEL_ID=$(gcloud ai models upload \
             --region="${REGION}" \
-            --display-name="iforest-${ENV_SUFFIX}-$(date +%Y%m%d%H%M%S)" \
-            --artifact-uri="gs://$MODEL_BUCKET/models/iforest/" \
+            --display-name="${MODEL_DISPLAY_NAME}" \
+            --artifact-uri="${MODEL_URI}" \
             --container-image-uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-4:latest" \
-            --format=json)
+            --format="value(name)")
 
-          # jqでmodel fieldを抽出
-          MODEL_RESOURCE_NAME=$(echo "${MODEL_UPLOAD_OUTPUT}" | jq -r '.model')
-
-          # リソース名からモデルIDを抽出
-          MODEL_ID=${MODEL_RESOURCE_NAME##*/}
-
-          if [ -z "$MODEL_ID" ] || [ "$MODEL_ID" = "null" ]; then
-            echo "::error::Failed to get MODEL_ID"
-            echo "::error::Upload output: ${MODEL_UPLOAD_OUTPUT}"
-            exit 1
-          fi
-
-          echo "Model uploaded with ID: ${MODEL_ID}"
-          echo "Full resource name: ${MODEL_RESOURCE_NAME}"
-
-          # 既存のエンドポイントを検索（nameフィルタを使用）
-          ENDPOINT_ID=$(gcloud ai endpoints list \
-            --region="${REGION}" \
-            --filter="name:dex-prediction-endpoint-${ENV_SUFFIX}" \
-            --format='value(name)' || true)
-
-          # エンドポイントが無ければTerraform outputから取得
-          if [ -z "$ENDPOINT_ID" ]; then
-            echo "Existing endpoint not found, getting from Terraform output..."
-            
-            # NOTE: Always point to ./terraform to avoid state lookup failures
-            ENDPOINT_ID=$(terraform -chdir=terraform output -raw vertex_ai_endpoint_id 2>/dev/null || echo "")
-            
-            # それでも空の場合はエラー
-            if [ -z "$ENDPOINT_ID" ]; then
-              echo "::error::ENDPOINT_ID could not be determined from either gcloud list or terraform output"
-              exit 1
-            fi
-          fi
-
-          echo "Using endpoint: ${ENDPOINT_ID}"
-
-          # モデルをエンドポイントにデプロイ
-          gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
-            --model="${MODEL_ID}" \
-            --display-name="iforest-${ENV_SUFFIX}" \
-            --region="${REGION}" \
-            --traffic-split=0=100 \
-            --machine-type=n1-standard-2
-
-          # GitHub 環境変数へ展開（エンドポイントIDのみ抽出）
-          ENDPOINT_ID_SHORT="${ENDPOINT_ID##*/}"
-          echo "ENDPOINT_ID=${ENDPOINT_ID_SHORT}" >> "$GITHUB_ENV"
-
-          echo "Model deployment completed. Endpoint ID: ${ENDPOINT_ID_SHORT}"
-
-      # 14) トラフィックを切り替えて古いモデルを削除
+      # 16) トラフィックを切り替えて古いモデルを削除
       - name: Swap traffic & abandon old model
         if: steps.deploy_vertex.outcome == 'success'
         run: |
@@ -302,11 +281,11 @@ jobs:
               --region "${REGION}" --quiet
           fi
 
-      # 15) Cloud Functions のデプロイ
+      # 17) Cloud Functions のデプロイ
       - name: Deploy Prediction Gateway Function
         if: env.ENABLE_PREDICTION_GATEWAY == 'true'
         env:
-          ENV_SUFFIX: ${{ env.ENV }}
+          ENV_SUFFIX: ${{ env.ENV_SUFFIX }}
           REGION: ${{ env.REGION }}
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
         run: |
