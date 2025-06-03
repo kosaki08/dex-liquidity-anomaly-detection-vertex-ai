@@ -11,38 +11,43 @@
 
 ```text
 .
-├── app/                 # Streamlit ダッシュボード
-├── containers/          # 本番用 Dockerfile 群
-│   ├── base/
-│   ├── training/
-│   └── serving/
-├── notebooks/           # EDA・実験用 Notebook
-├── pipelines/           # Vertex AI Pipelines 定義
-│   ├── components/      # 再利用可能な KFP コンポーネント
-│   ├── weekly_retrain.py
-│   └── hourly_prediction.py
-├── src/                 # ライブラリコード
-│   ├── data/            # データ取得（The Graph など）
-│   ├── features/        # 特徴量生成
-│   ├── models/          # モデル学習／推論ロジック
-│   └── utils/           # 監視ユーティリティ
-├── terraform/           # IaC（dev／prod ワークスペース）
-│   ├── modules/
-│   └── environments/
-├── tests/               # unit / integration / e2e
-├── .github/workflows/   # CI（Test → Build → Deploy）
-├── cloudbuild.yaml      # Cloud Build パイプライン
-└── pyproject.toml       # Poetry 設定
+├── docker/                   # Docker イメージ定義
+│   ├── fetcher/              # GraphQL データ取得用
+│   └── kfp/                  # Kubeflow Pipeline コンポーネント実行用
+├── functions/
+│   └── prediction_gateway/   # Vertex AI エンドポイント呼び出しラッパー
+├── jobs/                     # バッチ処理ジョブ
+│   └── feature_import/       # Feature Store インポート処理
+├── models/                   # SQL モデル定義（dbt風）
+│   ├── iforest/              # Isolation Forest モデルアーティファクト
+│   ├── mart/                 # 特徴量作成SQL
+│   └── staging/              # ステージングビュー
+├── pipelines/                # Vertex AI Pipelines 定義
+│   ├── components/           # 再利用可能な KFP コンポーネント
+│   └── hourly_prediction.py  # 予測パイプライン
+├── scripts/                  # 運用スクリプト
+│   ├── model/                # モデルトレーニング
+│   └── init_model.sh         # モデルアーティファクト初期化と更新
+├── src/                      # ライブラリコード
+│   ├── data/                 # データ取得（The Graph など）
+│   ├── features/             # 特徴量管理（Vertex Feature Store）
+│   └── models/               # モデル学習／推論ロジック
+├── terraform/                # IaC（dev／prod 環境）
+│   ├── modules/              # 再利用可能なモジュール
+│   └── envs/                 # 環境固有設定
+├── tests/                    # 自動テスト（unit/integration）
+├── cloudbuild.yaml           # CI/CD パイプライン
+└── pyproject.toml            # Poetry 依存関係
 ```
 
 ## 開発環境
 
-| ツール              | バージョン | 備考            |
-| ---------------- | ----- | ------------- |
-| Python           | 3.11  | Poetry で依存管理  |
-| Terraform        | ≥ 1.8 | modules に分割   |
-| Google Cloud SDK | 最新    | gcloud コマンド使用 |
-| Docker           | 24.x  | コンテナビルド       |
+| ツール           | バージョン | 備考                |
+| ---------------- | ---------- | ------------------- |
+| Python           | 3.11       | Poetry で依存管理   |
+| Terraform        | ≥ 1.8      | modules に分割      |
+| Google Cloud SDK | 最新       | gcloud コマンド使用 |
+| Docker           | 24.x       | コンテナビルド      |
 
 Dev Container を同梱しているため、VS Code + Docker があれば即環境を再現できます。
 
@@ -58,6 +63,7 @@ Dev Container を同梱しているため、VS Code + Docker があれば即環�
    gcloud init
    gcloud auth application-default login
    ```
+
 2. **Terraform でインフラ構築**
 
    ```bash
