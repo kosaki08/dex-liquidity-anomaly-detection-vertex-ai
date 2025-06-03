@@ -219,28 +219,42 @@ jobs:
           echo "Uploading model to gs://${MODEL_BUCKET}/models/iforest/"
           gsutil cp models/iforest/* gs://${MODEL_BUCKET}/models/iforest/
 
-          # モデルのアップロード
-          MODEL_ID=$(gcloud ai models upload \
+          # モデルのアップロード（JSON形式で取得）
+          echo "Uploading model to Vertex AI..."
+          MODEL_UPLOAD_OUTPUT=$(gcloud ai models upload \
             --region="${REGION}" \
             --display-name="iforest-${ENV_SUFFIX}-$(date +%Y%m%d%H%M%S)" \
             --artifact-uri="gs://$MODEL_BUCKET/models/iforest/" \
             --container-image-uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-4:latest" \
-            --format="value(name)")
+            --format=json)
+
+          # jqでmodel fieldを抽出
+          MODEL_RESOURCE_NAME=$(echo "${MODEL_UPLOAD_OUTPUT}" | jq -r '.model')
+
+          # リソース名からモデルIDを抽出
+          MODEL_ID=${MODEL_RESOURCE_NAME##*/}
+
+          if [ -z "$MODEL_ID" ] || [ "$MODEL_ID" = "null" ]; then
+            echo "::error::Failed to get MODEL_ID"
+            echo "::error::Upload output: ${MODEL_UPLOAD_OUTPUT}"
+            exit 1
+          fi
 
           echo "Model uploaded with ID: ${MODEL_ID}"
+          echo "Full resource name: ${MODEL_RESOURCE_NAME}"
 
-          # 既存のエンドポイントを検索
+          # 既存のエンドポイントを検索（nameフィルタを使用）
           ENDPOINT_ID=$(gcloud ai endpoints list \
             --region="${REGION}" \
-            --filter="displayName=dex-prediction-endpoint-${ENV_SUFFIX}" \
-            --format="value(name)" || true)
+            --filter="name:dex-prediction-endpoint-${ENV_SUFFIX}" \
+            --format='value(name)' || true)
 
           # エンドポイントが無ければTerraform outputから取得
           if [ -z "$ENDPOINT_ID" ]; then
             echo "Existing endpoint not found, getting from Terraform output..."
             
-            # Terraform outputから取得（修正: vertex_ai_endpoint_id を使用）
-            ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_id 2>/dev/null || echo "")
+            # NOTE: Always point to ./terraform to avoid state lookup failures
+            ENDPOINT_ID=$(terraform -chdir=terraform output -raw vertex_ai_endpoint_id 2>/dev/null || echo "")
             
             # それでも空の場合はエラー
             if [ -z "$ENDPOINT_ID" ]; then
@@ -254,6 +268,7 @@ jobs:
           # モデルをエンドポイントにデプロイ
           gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
             --model="${MODEL_ID}" \
+            --display-name="iforest-${ENV_SUFFIX}" \
             --region="${REGION}" \
             --traffic-split=0=100 \
             --machine-type=n1-standard-2
