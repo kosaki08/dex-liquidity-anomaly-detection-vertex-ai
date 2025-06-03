@@ -300,7 +300,7 @@ jobs:
             --region="${REGION}" \
             --format="value(deployedModels[].id)" || echo "No models deployed"
 
-          # デプロイ実行（--sync で同期実行）
+          # デプロイ実行（--syncを削除し、非同期で実行）
           # --traffic-split=0=100 は新規デプロイモデル（ID=0）に100%トラフィックを割り当て
           gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
             --region="${REGION}" \
@@ -309,10 +309,38 @@ jobs:
             --machine-type="n1-standard-4" \
             --min-replica-count=1 \
             --max-replica-count=3 \
-            --traffic-split=0=100 \
-            --sync
+            --traffic-split=0=100
 
-          # デプロイ検証：deployedModels が空でないことを確認
+          # デプロイ操作の完了を待つ（ポーリング）
+          echo "Waiting for deployment to complete..."
+          DEPLOY_TIMEOUT=600  # 10分
+          DEPLOY_START=$(date +%s)
+
+          while true; do
+            # 現在のデプロイ済みモデルを確認
+            CURRENT_MODELS=$(gcloud ai endpoints describe "${ENDPOINT_ID}" \
+              --region="${REGION}" \
+              --format="value(deployedModels[].model)")
+            
+            # MODEL_IDがデプロイされているか確認
+            if echo "${CURRENT_MODELS}" | grep -q "${MODEL_ID}"; then
+              echo "Model ${MODEL_ID} successfully deployed"
+              break
+            fi
+            
+            # タイムアウトチェック
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - DEPLOY_START))
+            if [ ${ELAPSED} -gt ${DEPLOY_TIMEOUT} ]; then
+              echo "::error::Deployment timeout after ${DEPLOY_TIMEOUT} seconds"
+              exit 1
+            fi
+            
+            echo "Still deploying... (${ELAPSED}s elapsed)"
+            sleep 30
+          done
+
+          # 最終的なデプロイ状態を確認
           DEPLOYED_MODELS=$(gcloud ai endpoints describe "${ENDPOINT_ID}" \
             --region="${REGION}" \
             --format="value(deployedModels[].id)")
