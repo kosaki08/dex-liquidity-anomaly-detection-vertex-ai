@@ -199,7 +199,8 @@ jobs:
             -lock-timeout=300s
 
           # outputsを環境変数に保存
-          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_name)" >> "$GITHUB_ENV"
+          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_numeric_id)" >> "$GITHUB_ENV"
+          echo "ENDPOINT_ID=$(terraform output -raw vertex_ai_endpoint_numeric_id)"
 
       # 13) Model をビルド
       - name: Build model artifact
@@ -284,74 +285,51 @@ jobs:
         run: |
           set -euo pipefail
 
+          REGION="${{ env.REGION }}"
           MODEL_ID="${{ steps.upload_model.outputs.model_id }}"
 
-          # ENDPOINT_ID の検証
+          echo "ENDPOINT_ID=${ENDPOINT_ID}"
           if [ -z "${ENDPOINT_ID}" ]; then
             echo "::error::ENDPOINT_ID is empty"
             exit 1
           fi
 
-          echo "Deploying model ${MODEL_ID} to endpoint ${ENDPOINT_ID}..."
+          # dev 環境は事前に全アンデプロイ（リソース節約）
+          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+            echo "Undeploying any existing models (dev only)…"
+            gcloud ai endpoints undeploy-model "${ENDPOINT_ID}" --all --region="${REGION}" --quiet || true
+          fi
 
-          # デプロイ前の状態を記録（デバッグ用）
-          echo "Current deployed models:"
-          gcloud ai endpoints describe "${ENDPOINT_ID}" \
-            --region="${REGION}" \
-            --format="value(deployedModels[].id)" || echo "No models deployed"
-
-          # デプロイ実行（--syncを削除し、非同期で実行）
-          # --traffic-split=0=100 は新規デプロイモデル（ID=0）に100%トラフィックを割り当て
-          gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
+          # デプロイ
+          echo "Deploying model ${MODEL_ID} to endpoint ${ENDPOINT_ID} ..."
+          OP=$(gcloud ai endpoints deploy-model "${ENDPOINT_ID}" \
             --region="${REGION}" \
             --model="${MODEL_ID}" \
             --display-name="iforest-${VERSION}" \
-            --machine-type="n1-standard-4" \
+            --machine-type=$([[ "${{ github.ref_name }}" == "dev" ]] && echo "n1-standard-2" || echo "n1-standard-4") \
             --min-replica-count=1 \
             --max-replica-count=3 \
-            --traffic-split=0=100
+            --traffic-split=0=100 \
+            --format="value(name)")
 
-          # デプロイ操作の完了を待つ（ポーリング）
-          echo "Waiting for deployment to complete..."
-          DEPLOY_TIMEOUT=600  # 10分
-          DEPLOY_START=$(date +%s)
-
-          while true; do
-            # 現在のデプロイ済みモデルを確認
-            CURRENT_MODELS=$(gcloud ai endpoints describe "${ENDPOINT_ID}" \
-              --region="${REGION}" \
-              --format="value(deployedModels[].model)")
-            
-            # MODEL_IDがデプロイされているか確認
-            if echo "${CURRENT_MODELS}" | grep -q "${MODEL_ID}"; then
-              echo "Model ${MODEL_ID} successfully deployed"
-              break
-            fi
-            
-            # タイムアウトチェック
-            CURRENT_TIME=$(date +%s)
-            ELAPSED=$((CURRENT_TIME - DEPLOY_START))
-            if [ ${ELAPSED} -gt ${DEPLOY_TIMEOUT} ]; then
-              echo "::error::Deployment timeout after ${DEPLOY_TIMEOUT} seconds"
-              exit 1
-            fi
-            
-            echo "Still deploying... (${ELAPSED}s elapsed)"
-            sleep 30
-          done
-
-          # 最終的なデプロイ状態を確認
-          DEPLOYED_MODELS=$(gcloud ai endpoints describe "${ENDPOINT_ID}" \
-            --region="${REGION}" \
-            --format="value(deployedModels[].id)")
-
-          if [[ -z "${DEPLOYED_MODELS}" ]] || [[ "${DEPLOYED_MODELS}" == "[]" ]]; then
-            echo "::error::Deployment reported success but deployedModels is empty"
+          echo "Operation: $OP"
+          echo "Waiting for deployment to finish…"
+          if ! gcloud ai operations wait "$OP" --region="${REGION}" --timeout=1200; then
+            echo "::error::Deployment failed or timed out"
+            gcloud ai operations describe "$OP" --region="${REGION}"
             exit 1
           fi
 
-          echo "Model deployment completed successfully"
-          echo "Deployed models: ${DEPLOYED_MODELS}"
+          # 検証
+          echo "Verifying deployed models…"
+          COUNT=$(gcloud ai endpoints describe "${ENDPOINT_ID}" \
+            --region="${REGION}" \
+            --format="value(deployedModels.id.len())")
+          if [[ "$COUNT" -eq 0 ]]; then
+            echo "::error::No models deployed after operation completed"
+            exit 1
+          fi
+          echo "Deployment succeeded (deployedModels=$COUNT)"
 
       # 17) トラフィックを切り替えて古いモデルを削除
       - name: Swap traffic & abandon old model
