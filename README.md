@@ -1,5 +1,12 @@
 # [WIP] Vertex AI DEX Liquidity Anomaly Detection
 
+## 関連プロジェクト
+
+- [オンプレミス版](https://github.com/kosaki08/dex-liquidity-anomaly-detection)
+- [データ分析ノートブック](https://github.com/kosaki08/dex-liquidity-anomaly-detection/tree/main/notebooks)
+
+## 概要
+
 分散型取引所（DEX）の流動性データを毎時収集し、Isolation Forest による異常スパイク検知を行うパイプラインです。
 
 - Uniswap V3 / Sushiswap で流動性プールの異常スパイクを検知
