@@ -18,7 +18,6 @@ output "data_bucket_name" {
   value       = google_storage_bucket.data_bucket.name
 }
 
-# ---------- Feature Store 関連の output ----------
 output "featurestore_id" {
   description = "作成された Feature Store の ID"
   value       = try(module.feature_store[0].featurestore_id, null)

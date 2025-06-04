@@ -1,4 +1,4 @@
-### KMS とバケット
+## KMS とバケット
 
 Cloud Storage バケットを CMEK で暗号化する場合は `service-<PROJECT_NUMBER>@gs-project-accounts.iam.gserviceaccount.com` に `roles/cloudkms.cryptoKeyEncrypterDecrypter` を付与する。
 （dev / prod どちらの bootstrap でも自動付与される実装）
