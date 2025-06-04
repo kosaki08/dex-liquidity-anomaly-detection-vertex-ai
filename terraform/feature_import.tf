@@ -34,9 +34,10 @@ module "feature_import_schedule" {
     module.bq_export_feature_import
   ]
 
-  name     = "fs-import-${local.env_suffix}"
-  region   = local.region
-  schedule = "15 * * * *" # EXPORT が終わる15分後
+  project_id = local.project_id
+  name       = "fs-import-${local.env_suffix}"
+  region     = local.region
+  schedule   = "15 * * * *" # EXPORT が終わる15分後
 
   job_name       = var.enable_feature_store ? module.feature_import_job[0].job_name : ""
   oauth_sa_email = module.service_accounts.emails["vertex-pipeline"]

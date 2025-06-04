@@ -199,6 +199,7 @@ module "fetcher_job_uniswap" {
 # Uniswap フェッチャースケジュール
 module "fetcher_schedule_uniswap" {
   source         = "./modules/cloud_scheduler"
+  project_id     = local.project_id
   name           = "dex-fetch-uniswap-${local.env_suffix}"
   region         = local.region
   schedule       = "0 * * * *"
@@ -234,6 +235,7 @@ module "fetcher_job_sushiswap" {
 # Sushiswap フェッチャースケジュール
 module "fetcher_schedule_sushiswap" {
   source         = "./modules/cloud_scheduler"
+  project_id     = local.project_id
   name           = "dex-fetch-sushiswap-${local.env_suffix}"
   region         = local.region
   schedule       = "0 * * * *"

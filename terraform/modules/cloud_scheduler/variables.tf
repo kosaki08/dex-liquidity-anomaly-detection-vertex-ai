@@ -1,3 +1,8 @@
+variable "project_id" {
+  type        = string
+  description = "Cloud Scheduler ジョブをデプロイするプロジェクト ID"
+}
+
 variable "name" {
   type        = string
   description = "Cloud Scheduler ジョブの名前"
