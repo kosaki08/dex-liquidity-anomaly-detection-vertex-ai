@@ -1,5 +1,5 @@
 locals {
-  run_job_uri = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/${var.job_name}:run"
+  run_job_uri = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.project_id}/jobs/${var.job_name}:run"
 }
 
 # TODO: Cloud Scheduler 失敗を Cloud Monitoring へ送信する
