@@ -38,8 +38,6 @@ prod  → tf-apply-prod
 2. state に無いものだけ `terraform import …`
 3. `terraform plan -refresh-only` が差分ゼロになるまで繰り返し
 
-> BigQuery Dataset、Service Account、Feature Store の import コマンド例を載せておくと実践しやすい。
-
 ## トラブルシューティング
 
 - `Error 409 Already Exists`
